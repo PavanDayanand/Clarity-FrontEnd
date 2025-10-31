@@ -9,6 +9,8 @@ import PrimaryNav from "../components/PrimaryNav.jsx";
 import Footer from "../components/Footer.jsx";
 import ScrollIndicator from "../components/ui/ScrollIndicator.jsx";
 import BackgroundGrid from "../components/ui/BackgroundGrid.jsx";
+import { generateReport } from "../api/clarityApi.js";
+import { findDiseaseByName, getTopFindings } from "../utils/diseaseLookup.js";
 
 const reportInfoCards = [
   {
@@ -32,29 +34,92 @@ function ReportPage() {
   const {
     originalImage = "/placeholder-xray.png",
     heatmapImage,
-    disease = defaultDisease,
-    confidence = 0.82,
+    disease: initialDisease = defaultDisease,
+    confidence: initialConfidence = 0.82,
     fileName = "Uploaded study",
+    file,
+    predictions: initialPredictions,
+    positiveFindings: initialPositiveFindings,
+    predictionSummary: initialPredictionSummary,
+    topFinding: initialTopFinding,
+    report: initialReport,
+    patientInfo: initialPatientInfo,
   } = location.state ?? {};
   const [typedText, setTypedText] = useState("");
   const [showPreview, setShowPreview] = useState(false);
   const [cursorVisible, setCursorVisible] = useState(true);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const pendingNavigation = useRef(null);
+  const [reportData, setReportData] = useState(
+    initialReport ? { report: initialReport } : null
+  );
+  const [apiError, setApiError] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [patientInfo, setPatientInfo] = useState({
+    name: initialPatientInfo?.name ?? "",
+    age: initialPatientInfo?.age ? String(initialPatientInfo.age) : "",
+    gender: initialPatientInfo?.gender ?? "",
+    patient_id: initialPatientInfo?.patient_id ?? "",
+    email: initialPatientInfo?.email ?? "",
+  });
+  const [positiveFindings, setPositiveFindings] = useState(
+    initialPositiveFindings ?? []
+  );
+  const [predictionSummary, setPredictionSummary] = useState(
+    initialPredictionSummary ??
+      getTopFindings(initialPositiveFindings ?? [], initialPredictions)
+  );
+  const [focusDiseaseName, setFocusDiseaseName] = useState(
+    initialTopFinding ?? initialDisease?.name ?? "Selected finding"
+  );
+  const [confidenceScore, setConfidenceScore] = useState(
+    typeof initialConfidence === "number" ? initialConfidence : 0.82
+  );
 
   const smoothTransition = { duration: 0.7, ease: [0.16, 1, 0.3, 1] };
   const effectiveHeatmap = heatmapImage ?? originalImage;
+  const disease = useMemo(
+    () => findDiseaseByName(focusDiseaseName),
+    [focusDiseaseName]
+  );
   const findingName = disease?.name ?? "Selected finding";
 
+  const genderLabel = useMemo(() => {
+    const value = (patientInfo.gender ?? "").toString().trim();
+    if (!value) {
+      return "";
+    }
+
+    const normalized = value.toUpperCase();
+    if (normalized === "M") {
+      return "Male";
+    }
+    if (normalized === "F") {
+      return "Female";
+    }
+    if (normalized === "OTHER") {
+      return "Other";
+    }
+    return value;
+  }, [patientInfo.gender]);
+
   const confidencePercent = useMemo(
-    () => Math.round(Math.min(Math.max(confidence, 0), 1) * 100),
-    [confidence]
+    () => Math.round(Math.min(Math.max(confidenceScore ?? 0, 0), 1) * 100),
+    [confidenceScore]
   );
 
-  const reportContent = useMemo(() => {
+  const fallbackReport = useMemo(() => {
     const lowerFinding = findingName.toLowerCase();
     return `Clarity AI Thoracic Report\n\nStudy: ${fileName}\nPrimary Finding: ${findingName}\nConfidence: ${confidencePercent}%\n\nSummary:\n- Grad-CAM corroborates the focus regions consistent with ${lowerFinding}.\n- No conflicting anomalies surfaced on bilateral comparison heuristics.\n- Recommend correlating with lab values and symptom onset to confirm diagnosis.\n\nNext Steps:\n1. Review Grad-CAM overlay for localisation context.\n2. Append attending commentary before finalising export.\n3. Dispatch PDF to PACS and notify MDT channel.`;
   }, [confidencePercent, fileName, findingName]);
+
+  const reportContent = useMemo(() => {
+    const generated = reportData?.report;
+    if (generated && typeof generated === "string" && generated.trim()) {
+      return generated;
+    }
+    return fallbackReport;
+  }, [fallbackReport, reportData?.report]);
 
   useEffect(() => {
     setTypedText("");
@@ -107,8 +172,15 @@ function ReportPage() {
       originalImage,
       heatmapImage: effectiveHeatmap,
       disease,
-      confidence,
+      confidence: confidenceScore,
       fileName,
+      file,
+      predictions: reportData?.predictions ?? initialPredictions ?? null,
+      positiveFindings,
+      predictionSummary,
+      topFinding: focusDiseaseName,
+      report: reportData?.report ?? reportContent,
+      patientInfo,
     };
     pendingNavigation.current = () => {
       navigate(path, { state: navState });
@@ -118,6 +190,112 @@ function ReportPage() {
 
   const handleNavigation = (path) => {
     triggerNavigation(path);
+  };
+
+  const handlePatientInfoChange = (field) => (event) => {
+    const value = event.target.value;
+    setApiError(null);
+    setPatientInfo((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  const handleGenerateReport = async (event) => {
+    event.preventDefault();
+    if (!file) {
+      setApiError(
+        "Upload an imaging study on the home page before generating a report."
+      );
+      return;
+    }
+
+    if (!patientInfo.name.trim() || !patientInfo.age || !patientInfo.gender) {
+      setApiError("Name, age, and gender are required to generate a report.");
+      return;
+    }
+
+    const numericAge = Number(patientInfo.age);
+    if (Number.isNaN(numericAge)) {
+      setApiError("Provide a valid numeric age.");
+      return;
+    }
+
+    setApiError(null);
+    setIsLoading(true);
+    setShowPreview(false);
+    setTypedText("");
+    setReportData(null);
+
+    try {
+      const response = await generateReport(file, {
+        ...patientInfo,
+        age: numericAge,
+        gender: patientInfo.gender,
+      });
+      if (response?.success === false) {
+        throw new Error(response?.message ?? "Report generation failed.");
+      }
+      setReportData(response);
+
+      if (response?.patient_info) {
+        const incomingGender = response.patient_info.gender;
+        const normalizedGender = (() => {
+          if (!incomingGender) {
+            return "";
+          }
+          const value = incomingGender.toString().trim().toUpperCase();
+          if (value === "MALE" || value === "M") {
+            return "M";
+          }
+          if (value === "FEMALE" || value === "F") {
+            return "F";
+          }
+          if (value === "OTHER" || value === "O") {
+            return "Other";
+          }
+          return incomingGender;
+        })();
+        setPatientInfo((prev) => ({
+          ...prev,
+          ...response.patient_info,
+          age: String(response.patient_info.age ?? prev.age ?? ""),
+          gender: normalizedGender,
+        }));
+      }
+
+      const positive = Array.isArray(response?.positive_findings)
+        ? response.positive_findings
+        : [];
+      setPositiveFindings(positive);
+
+      const summary = getTopFindings(positive, response?.predictions);
+      setPredictionSummary(summary);
+
+      const derivedFocus =
+        summary[0]?.disease ?? response?.top_disease ?? focusDiseaseName;
+      setFocusDiseaseName(derivedFocus);
+
+      const derivedConfidenceRaw =
+        response?.confidence ?? summary[0]?.probability ?? confidenceScore;
+      const derivedConfidence =
+        typeof derivedConfidenceRaw === "number"
+          ? derivedConfidenceRaw
+          : typeof derivedConfidenceRaw === "string"
+          ? Number(derivedConfidenceRaw)
+          : null;
+      if (
+        typeof derivedConfidence === "number" &&
+        !Number.isNaN(derivedConfidence)
+      ) {
+        setConfidenceScore(derivedConfidence);
+      }
+    } catch (error) {
+      console.error("Report generation failed", error);
+      setApiError(error.message ?? "Unable to generate the report.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleDownload = () => {
@@ -134,7 +312,7 @@ function ReportPage() {
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#031029] text-white">
-      <ScrollIndicator />
+      <ScrollIndicator className="right-3 sm:right-4 md:right-8 lg:right-12" />
       <div className="pointer-events-none absolute inset-0 opacity-90">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(21,92,255,0.45),rgba(3,10,28,0.98))]" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom,rgba(2,8,22,0.95),#020713)]" />
@@ -190,7 +368,7 @@ function ReportPage() {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ ...smoothTransition, delay: 0.1 }}
-            className="mx-auto w-full max-w-3xl text-center pt-16"
+            className="mx-auto w-full max-w-3xl px-6 pt-16 text-center sm:px-12"
           >
             <motion.h1
               initial={{ opacity: 0, y: 24 }}
@@ -211,13 +389,23 @@ function ReportPage() {
               Configure printable briefs, merge Grad-CAM evidence, and surface
               key talking points before multidisciplinary rounds.
             </motion.p>
+            {isLoading ? (
+              <motion.p
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ ...smoothTransition, delay: 0.3 }}
+                className="mt-4 text-sm font-medium text-cyan-200/90"
+              >
+                Generating detailed findings&hellip;
+              </motion.p>
+            ) : null}
           </motion.section>
 
           <motion.section
             initial={{ opacity: 0, y: 40 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ ...smoothTransition, delay: 0.2 }}
-            className="mt-14 flex w-full flex-col items-center gap-10"
+            className="mt-14 flex w-full flex-col items-center gap-10 px-6 sm:px-12"
           >
             <div className="flex w-full max-w-5xl flex-col gap-6 rounded-[34px] border border-white/10 bg-white/5 p-10 backdrop-blur-2xl lg:p-12">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -234,6 +422,111 @@ function ReportPage() {
                   Auto-generated
                 </span>
               </div>
+
+              <form
+                onSubmit={handleGenerateReport}
+                className="mt-6 grid w-full gap-4 text-left lg:grid-cols-2"
+                noValidate
+              >
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-semibold uppercase tracking-[0.28em] text-cyan-200/80">
+                    Patient name
+                  </label>
+                  <input
+                    type="text"
+                    value={patientInfo.name}
+                    onChange={handlePatientInfoChange("name")}
+                    placeholder="e.g. Jordan Miller"
+                    className="w-full rounded-2xl border border-white/12 bg-[#0d1f3f]/70 px-4 py-3 text-sm text-white placeholder:text-white/40 focus:border-cyan-300/60 focus:outline-none"
+                    required
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-semibold uppercase tracking-[0.28em] text-cyan-200/80">
+                    Age
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={patientInfo.age}
+                    onChange={handlePatientInfoChange("age")}
+                    placeholder="45"
+                    className="w-full rounded-2xl border border-white/12 bg-[#0d1f3f]/70 px-4 py-3 text-sm text-white placeholder:text-white/40 focus:border-cyan-300/60 focus:outline-none"
+                    required
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-semibold uppercase tracking-[0.28em] text-cyan-200/80">
+                    Gender
+                  </label>
+                  <select
+                    value={patientInfo.gender}
+                    onChange={handlePatientInfoChange("gender")}
+                    className="w-full appearance-none rounded-2xl border border-white/12 bg-[#0d1f3f]/70 px-4 py-3 text-sm text-white focus:border-cyan-300/60 focus:outline-none"
+                    required
+                  >
+                    <option value="" disabled hidden>
+                      Select gender
+                    </option>
+                    <option value="M">Male</option>
+                    <option value="F">Female</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-semibold uppercase tracking-[0.28em] text-cyan-200/80">
+                    Patient ID (optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={patientInfo.patient_id}
+                    onChange={handlePatientInfoChange("patient_id")}
+                    placeholder="CLT-2049"
+                    className="w-full rounded-2xl border border-white/12 bg-[#0d1f3f]/70 px-4 py-3 text-sm text-white placeholder:text-white/40 focus:border-cyan-300/60 focus:outline-none"
+                  />
+                </div>
+                <div className="flex flex-col gap-2 lg:col-span-2">
+                  <label className="text-xs font-semibold uppercase tracking-[0.28em] text-cyan-200/80">
+                    Email (optional)
+                  </label>
+                  <input
+                    type="email"
+                    value={patientInfo.email}
+                    onChange={handlePatientInfoChange("email")}
+                    placeholder="patient@example.com"
+                    className="w-full rounded-2xl border border-white/12 bg-[#0d1f3f]/70 px-4 py-3 text-sm text-white placeholder:text-white/40 focus:border-cyan-300/60 focus:outline-none"
+                  />
+                </div>
+                <div className="flex flex-col gap-3 lg:col-span-2 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="text-xs text-white/60">
+                    Provide demographics to personalise the generated report. No
+                    PHI leaves your session.
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {apiError ? (
+                      <span className="text-sm font-medium text-rose-300">
+                        {apiError}
+                      </span>
+                    ) : null}
+                    {!apiError && reportData ? (
+                      <span className="text-sm font-medium text-emerald-300/90">
+                        Report updated
+                      </span>
+                    ) : null}
+                    <button
+                      type="submit"
+                      disabled={isLoading}
+                      className={`rounded-2xl px-5 py-2 text-sm font-semibold text-white transition ${
+                        isLoading
+                          ? "bg-white/10 text-white/50"
+                          : "bg-linear-to-r from-cyan-400 via-sky-500 to-blue-600 shadow-[0_18px_45px_-28px_rgba(33,150,243,0.7)] hover:shadow-[0_18px_48px_-22px_rgba(33,150,243,0.8)]"
+                      }`}
+                    >
+                      {isLoading ? "Generating…" : "Generate AI Report"}
+                    </button>
+                  </div>
+                </div>
+              </form>
 
               <div className="relative flex min-h-120 flex-col justify-center overflow-hidden rounded-[28px] border border-white/5 bg-black/60 px-6 py-10 shadow-[0_50px_110px_-60px_rgba(37,99,235,0.6)] sm:px-8 lg:px-12 lg:py-16">
                 <AnimatePresence mode="wait">
@@ -348,12 +641,60 @@ function ReportPage() {
                 </div>
                 <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
                   <div className="text-xs uppercase tracking-[0.32em] text-cyan-200">
+                    Patient details
+                  </div>
+                  <ul className="mt-2 space-y-1 text-white/75">
+                    <li>{patientInfo.name || "Name pending"}</li>
+                    <li>
+                      {patientInfo.age
+                        ? `${patientInfo.age} years`
+                        : "Age pending"}
+                    </li>
+                    <li>
+                      {genderLabel ? `Gender ${genderLabel}` : "Gender pending"}
+                    </li>
+                    {patientInfo.patient_id ? (
+                      <li>ID {patientInfo.patient_id}</li>
+                    ) : null}
+                    {patientInfo.email ? <li>{patientInfo.email}</li> : null}
+                  </ul>
+                </div>
+                <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
+                  <div className="text-xs uppercase tracking-[0.32em] text-cyan-200">
                     Primary finding
                   </div>
                   <p className="mt-2 text-white/80">
                     {findingName} · Confidence {confidencePercent}%
                   </p>
                 </div>
+                {predictionSummary.length > 0 ? (
+                  <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
+                    <div className="text-xs uppercase tracking-[0.32em] text-cyan-200">
+                      Model findings
+                    </div>
+                    <ul className="mt-3 space-y-2 text-sm text-white/75 sm:text-base">
+                      {predictionSummary.slice(0, 4).map((finding) => {
+                        const probability = Math.min(
+                          Math.max(finding.probability ?? 0, 0),
+                          1
+                        );
+                        return (
+                          <li
+                            key={`${finding.disease}-${probability}`}
+                            className="flex items-center justify-between gap-3 rounded-2xl bg-white/5 px-3 py-2"
+                          >
+                            <span className="truncate text-white/85">
+                              {finding.disease}
+                            </span>
+                            <span className="text-white/65">
+                              {(probability * 100).toFixed(1)}%
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                ) : null}
                 <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
                   <div className="text-xs uppercase tracking-[0.32em] text-cyan-200">
                     Evidence sources
@@ -376,7 +717,7 @@ function ReportPage() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.3 }}
             transition={{ ...smoothTransition, delay: 0.18 }}
-            className="mt-14 grid gap-6 md:grid-cols-3"
+            className="mt-14 grid gap-6 px-6 sm:px-12 md:grid-cols-3"
           >
             {reportInfoCards.map((card, index) => (
               <motion.div
@@ -401,7 +742,7 @@ function ReportPage() {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ ...smoothTransition, delay: 0.3 }}
-            className="mt-14 flex flex-wrap justify-center gap-4"
+            className="mt-14 flex flex-wrap justify-center gap-4 px-6 sm:px-12"
           >
             <button
               type="button"

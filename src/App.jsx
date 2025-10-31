@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AnimatePresence,
   motion,
@@ -622,6 +622,10 @@ const uploadActions = [
   { id: "report", label: "Generate Report", view: "report" },
 ];
 
+const LOADER_DURATION_MS = 2500;
+const LOADER_EXIT_DELAY_MS = 320;
+const LOADER_COMPLETION_PAUSE_MS = 420;
+
 const easingOutCubic = (t) => 1 - Math.pow(1 - t, 3);
 
 function useCountUp(target, start, { duration = 1600, decimals = 0 } = {}) {
@@ -888,6 +892,10 @@ function App() {
   const [confidenceScore, setConfidenceScore] = useState(randomConfidence());
   const [spotlightBroken, setSpotlightBroken] = useState(false);
   const [activeSlide, setActiveSlide] = useState(null);
+  const [isLoaderActive, setIsLoaderActive] = useState(false);
+  const [loaderProgress, setLoaderProgress] = useState(0);
+  const [loaderMessage, setLoaderMessage] = useState("Calibrating upload…");
+  const [loaderShownForUpload, setLoaderShownForUpload] = useState(false);
   const spotlightPoints = useMemo(
     () => [
       "Overlay pinpoints right upper lobe opacity with 0.84 confidence.",
@@ -896,6 +904,22 @@ function App() {
     ],
     []
   );
+  const loaderFrameRef = useRef(null);
+  const loaderTimeoutRef = useRef(null);
+  const pendingViewRef = useRef(null);
+  const loaderSecondsRemaining = Math.max(
+    Math.ceil((LOADER_DURATION_MS / 1000) * (1 - loaderProgress / 100)),
+    0
+  );
+  const loaderStatusText = loaderMessage.startsWith("Ready")
+    ? "Analysis ready"
+    : `≈${Math.max(loaderSecondsRemaining, 1)}s left`;
+  const loaderHeadline = loaderMessage.startsWith("Ready")
+    ? "Analysis complete"
+    : "Analysing upload…";
+  const loaderFooterText = loaderMessage.startsWith("Ready")
+    ? "Launching experience"
+    : "Clarity is preparing your workspace";
 
   useEffect(() => {
     if (activeSlide === null) return undefined;
@@ -970,6 +994,145 @@ function App() {
   );
   const uploadYSpring = useSpring(uploadY, { stiffness: 100, damping: 26 });
 
+  const clearLoaderTimers = useCallback(() => {
+    if (loaderFrameRef.current) {
+      cancelAnimationFrame(loaderFrameRef.current);
+      loaderFrameRef.current = null;
+    }
+    if (loaderTimeoutRef.current) {
+      clearTimeout(loaderTimeoutRef.current);
+      loaderTimeoutRef.current = null;
+    }
+  }, []);
+
+  const cancelLoader = useCallback(() => {
+    clearLoaderTimers();
+    pendingViewRef.current = null;
+    setIsLoaderActive(false);
+    setLoaderProgress(0);
+    setLoaderMessage("Calibrating upload…");
+  }, [clearLoaderTimers]);
+
+  useEffect(() => {
+    return () => {
+      clearLoaderTimers();
+    };
+  }, [clearLoaderTimers]);
+
+  useEffect(() => {
+    if (isLoaderActive) {
+      const previousOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = previousOverflow;
+      };
+    }
+    return undefined;
+  }, [isLoaderActive]);
+
+  const navigateWithView = useCallback(
+    (view) => {
+      if (!uploadedFile) {
+        return;
+      }
+
+      const baseImage = previewUrl ?? "/iStock-115987328.webp";
+      const payload = {
+        originalImage: baseImage,
+        heatmapImage: baseImage,
+        disease: defaultDisease,
+        confidence: confidenceScore,
+        view,
+        fileName: uploadedFile?.name ?? "Uploaded study",
+        file: uploadedFile,
+        previewUrl,
+      };
+
+      if (view === "gradcam") {
+        navigate("/gradcam", { state: payload });
+        return;
+      }
+
+      if (view === "report") {
+        navigate("/report", { state: payload });
+        return;
+      }
+
+      navigate("/predict", { state: payload });
+    },
+    [navigate, previewUrl, uploadedFile, confidenceScore]
+  );
+
+  const finalizeLoader = useCallback(() => {
+    loaderTimeoutRef.current = null;
+    const targetView = pendingViewRef.current;
+    pendingViewRef.current = null;
+
+    if (!targetView) {
+      setIsLoaderActive(false);
+      return;
+    }
+
+    setLoaderShownForUpload(true);
+    setIsLoaderActive(false);
+    loaderTimeoutRef.current = window.setTimeout(() => {
+      navigateWithView(targetView);
+      loaderTimeoutRef.current = null;
+    }, LOADER_EXIT_DELAY_MS);
+  }, [navigateWithView]);
+
+  const resolveLoaderPhaseMessage = useCallback((progress) => {
+    if (progress >= 90) {
+      return "Compiling structured summary…";
+    }
+    if (progress >= 60) {
+      return "Aligning Grad-CAM overlays…";
+    }
+    if (progress >= 30) {
+      return "Scoring differential predictions…";
+    }
+    return "Calibrating upload…";
+  }, []);
+
+  const startLoader = useCallback(
+    (view) => {
+      clearLoaderTimers();
+      pendingViewRef.current = view;
+      setLoaderProgress(0);
+      setLoaderMessage(resolveLoaderPhaseMessage(0));
+      setIsLoaderActive(true);
+
+      const startedAt = performance.now();
+
+      const tick = (now) => {
+        const elapsed = now - startedAt;
+        const progress = Math.min(
+          Math.round((elapsed / LOADER_DURATION_MS) * 100),
+          100
+        );
+        setLoaderProgress(progress);
+        setLoaderMessage((current) => {
+          const next = resolveLoaderPhaseMessage(progress);
+          return current === next ? current : next;
+        });
+
+        if (elapsed < LOADER_DURATION_MS) {
+          loaderFrameRef.current = requestAnimationFrame(tick);
+        } else {
+          loaderFrameRef.current = null;
+          setLoaderProgress(100);
+          loaderTimeoutRef.current = window.setTimeout(() => {
+            setLoaderMessage("Ready — launching experience");
+            finalizeLoader();
+          }, LOADER_COMPLETION_PAUSE_MS);
+        }
+      };
+
+      loaderFrameRef.current = requestAnimationFrame(tick);
+    },
+    [clearLoaderTimers, finalizeLoader, resolveLoaderPhaseMessage]
+  );
+
   const handleScrollToUpload = () => {
     uploadRef.current?.scrollIntoView({
       behavior: "smooth",
@@ -981,6 +1144,9 @@ function App() {
     if (previewUrl) {
       URL.revokeObjectURL(previewUrl);
     }
+
+    cancelLoader();
+    setLoaderShownForUpload(false);
 
     if (!file) {
       setUploadedFile(null);
@@ -1010,33 +1176,26 @@ function App() {
   };
 
   const handleNavigateToPredict = (view = "summary") => {
-    if (!uploadedFile) {
+    if (!uploadedFile || isLoaderActive) {
+      if (!uploadedFile) {
+        return;
+      }
       return;
     }
 
-    const payload = {
-      originalImage: previewUrl ?? "/iStock-115987328.webp",
-      heatmapImage: previewUrl ?? "/iStock-115987328.webp",
-      disease: defaultDisease,
-      confidence: confidenceScore,
-      view,
-      fileName: uploadedFile?.name ?? "Uploaded study",
-    };
-
-    if (view === "gradcam") {
-      navigate("/gradcam", { state: payload });
+    if (!loaderShownForUpload) {
+      startLoader(view);
       return;
     }
 
-    if (view === "report") {
-      navigate("/report", { state: payload });
-      return;
-    }
-
-    navigate("/predict", { state: payload });
+    navigateWithView(view);
   };
 
   const handlePrimaryNavigation = (path) => {
+    if (isLoaderActive) {
+      return;
+    }
+
     const featureView = featureRouteViews[path];
 
     if (featureView) {
@@ -1072,6 +1231,97 @@ function App() {
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#010718] text-white">
       <ScrollIndicator />
+
+      <AnimatePresence>
+        {isLoaderActive ? (
+          <motion.div
+            key="clarity-loader"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-[#02061f]/80 backdrop-blur-[10px]"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <motion.div
+              className="relative w-[min(460px,92vw)] overflow-hidden rounded-4xl border border-white/12 bg-[linear-gradient(140deg,rgba(24,54,147,0.97),rgba(8,18,56,0.97))] p-8 text-left shadow-[0_48px_160px_-60px_rgba(35,108,255,0.9)]"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.94 }}
+              transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <div className="pointer-events-none absolute inset-0 opacity-80">
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(94,149,255,0.6),transparent_60%)]" />
+                <div className="absolute -bottom-28 -left-20 h-64 w-64 rounded-full bg-[rgba(64,120,255,0.28)] blur-3xl" />
+                <div className="absolute -top-20 right-10 h-40 w-40 rounded-full bg-[rgba(109,160,255,0.32)] blur-[90px]" />
+              </div>
+              <div className="relative z-10">
+                <div className="flex items-center gap-2 text-[0.65rem] font-semibold uppercase tracking-[0.48em] text-sky-100/85">
+                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/12 text-sky-200">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      className="h-4 w-4"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M12 3v6l3-3m-3 3-3-3"
+                      />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M7.5 13a4.5 4.5 0 0 0 9 0c0-1.657 1.343-3 3-3"
+                      />
+                    </svg>
+                  </span>
+                  {loaderHeadline}
+                </div>
+                <div className="mt-6 flex items-baseline gap-6">
+                  <span className="text-6xl font-semibold text-white drop-shadow-[0_12px_35px_rgba(23,78,203,0.35)]">
+                    {loaderProgress}
+                    <span className="text-2xl align-super">%</span>
+                  </span>
+                  <span className="flex items-center gap-2 text-sm text-sky-100/85">
+                    <span className="inline-flex h-1.5 w-1.5 rounded-full bg-sky-200/80" />
+                    {loaderStatusText}
+                  </span>
+                </div>
+                <div className="mt-7">
+                  <div className="relative h-14 overflow-hidden rounded-3xl border border-white/15 bg-white/10 backdrop-blur-[2px]">
+                    <motion.div
+                      className="absolute inset-y-1 left-1 flex items-center justify-end rounded-2xl bg-[linear-gradient(115deg,#e8f1ff,#a7c5ff,#6f97ff)] text-sm font-semibold text-[#16316f] shadow-[0_10px_55px_-30px_rgba(129,178,255,0.9)]"
+                      animate={{ width: `${Math.max(loaderProgress, 8)}%` }}
+                      transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                      style={{ minWidth: "4.5rem" }}
+                    >
+                      <span className="pr-4">{loaderProgress}%</span>
+                    </motion.div>
+                    <div className="pointer-events-none absolute inset-0 rounded-3xl bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.18),transparent_70%)]" />
+                  </div>
+                  <div className="mt-3 flex justify-between text-[0.65rem] font-semibold tracking-[0.36em] text-sky-100/60">
+                    <span>0</span>
+                    <span>50</span>
+                    <span>100</span>
+                  </div>
+                </div>
+                <div className="mt-7 flex items-center gap-3 text-sm text-sky-100/90">
+                  <span className="inline-flex h-3 w-3 animate-pulse rounded-full bg-sky-300 shadow-[0_0_15px_rgba(125,162,255,0.9)]" />
+                  {loaderMessage}
+                </div>
+                <div className="mt-6 flex items-center gap-3 text-[0.7rem] uppercase tracking-[0.4em] text-sky-100/45">
+                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-white/20">
+                    <span className="h-3 w-3 animate-spin rounded-full border-2 border-white/20 border-t-white/70" />
+                  </span>
+                  {loaderFooterText}
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
 
       <div className="pointer-events-none absolute inset-0 opacity-95">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(8,40,90,0.7),rgba(1,6,18,1))]" />
