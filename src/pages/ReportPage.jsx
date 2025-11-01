@@ -12,6 +12,8 @@ import ScrollIndicator from "../components/ui/ScrollIndicator.jsx";
 import BackgroundGrid from "../components/ui/BackgroundGrid.jsx";
 import { generateReport } from "../api/clarityApi.js";
 import { findDiseaseByName, getTopFindings } from "../utils/diseaseLookup.js";
+import { usePopup } from "../components/ui/PopupProvider.jsx";
+import { useUpload } from "../context/UploadContext.jsx";
 
 const reportInfoCards = [
   {
@@ -27,6 +29,9 @@ const reportInfoCards = [
     body: "Drafts export straight into PACS or EHR inboxes. Radiologists review, amend, and finalise in minutes instead of rebuilding reports from scratch.",
   },
 ];
+
+const leftFeatureImage = encodeURI("/Gemini Generated Image.png");
+const rightFeatureImage = encodeURI("/Chest Blood Vessels MRA Scan.jpeg");
 
 const parseReportContent = (content) => {
   if (!content) {
@@ -114,20 +119,46 @@ function ReportPage() {
   const navigate = useNavigate();
   const location = useLocation();
   useScrollToTop();
-  const {
-    originalImage = "/placeholder-xray.png",
-    heatmapImage,
-    disease: initialDisease = defaultDisease,
-    confidence: initialConfidence = 0.82,
-    fileName = "Uploaded study",
-    file,
-    predictions: initialPredictions,
-    positiveFindings: initialPositiveFindings,
-    predictionSummary: initialPredictionSummary,
-    topFinding: initialTopFinding,
-    report: initialReport,
-    patientInfo: initialPatientInfo,
-  } = location.state ?? {};
+  const { uploadData, updateUploadData } = useUpload();
+  const locationState = location.state ?? {};
+  const file = locationState.file ?? uploadData.file ?? null;
+  const fileName =
+    locationState.fileName ?? uploadData.fileName ?? "Uploaded study";
+  const originalImage =
+    locationState.originalImage ??
+    uploadData.originalImage ??
+    uploadData.previewUrl ??
+    "/placeholder-xray.png";
+  const heatmapImage =
+    locationState.heatmapImage ??
+    uploadData.heatmapImage ??
+    uploadData.previewUrl ??
+    null;
+  const initialDisease =
+    locationState.disease ?? uploadData.disease ?? defaultDisease;
+  const initialConfidence =
+    locationState.confidence ?? uploadData.confidence ?? 0.82;
+  const initialPredictions =
+    locationState.predictions ?? uploadData.predictions ?? null;
+  const initialPositiveFindings =
+    locationState.positiveFindings ?? uploadData.positiveFindings ?? [];
+  const derivedSummary = getTopFindings(
+    initialPositiveFindings ?? [],
+    initialPredictions
+  );
+  const initialPredictionSummary =
+    locationState.predictionSummary ??
+    uploadData.predictionSummary ??
+    derivedSummary;
+  const initialTopFinding =
+    locationState.topFinding ??
+    uploadData.topFinding ??
+    initialPredictionSummary?.[0]?.disease ??
+    initialDisease?.name ??
+    "Selected finding";
+  const initialReport = locationState.report ?? uploadData.report ?? null;
+  const initialPatientInfo =
+    locationState.patientInfo ?? uploadData.patientInfo ?? null;
   const [typedText, setTypedText] = useState("");
   const [showPreview, setShowPreview] = useState(false);
   const [cursorVisible, setCursorVisible] = useState(true);
@@ -149,15 +180,12 @@ function ReportPage() {
     email: initialPatientInfo?.email ?? "",
   });
   const [positiveFindings, setPositiveFindings] = useState(
-    initialPositiveFindings ?? []
+    initialPositiveFindings
   );
   const [predictionSummary, setPredictionSummary] = useState(
-    initialPredictionSummary ??
-      getTopFindings(initialPositiveFindings ?? [], initialPredictions)
+    initialPredictionSummary
   );
-  const [focusDiseaseName, setFocusDiseaseName] = useState(
-    initialTopFinding ?? initialDisease?.name ?? "Selected finding"
-  );
+  const [focusDiseaseName, setFocusDiseaseName] = useState(initialTopFinding);
   const [confidenceScore, setConfidenceScore] = useState(
     typeof initialConfidence === "number" ? initialConfidence : 0.82
   );
@@ -227,6 +255,7 @@ function ReportPage() {
     () => parseReportContent(reportContent),
     [reportContent]
   );
+  const { showPopup } = usePopup();
 
   const narrativeBlocks = useMemo(
     () =>
@@ -243,6 +272,17 @@ function ReportPage() {
   );
 
   useEffect(() => {
+    if (!file) {
+      showPopup({
+        title: "Upload required",
+        message:
+          "Add an imaging study on the home page before generating reports.",
+        variant: "warning",
+      });
+      navigate("/", { replace: true });
+      return;
+    }
+
     setTypedText("");
     setShowPreview(false);
     setCursorVisible(true);
@@ -269,7 +309,7 @@ function ReportPage() {
     return () => {
       clearInterval(typeInterval);
     };
-  }, [reportContent]);
+  }, [file, navigate, reportContent, showPopup]);
 
   useEffect(() => {
     if (showPreview) {
@@ -351,6 +391,11 @@ function ReportPage() {
       return;
     }
 
+    const basePatientInfo = {
+      ...patientInfo,
+      age: String(numericAge),
+    };
+
     setApiError(null);
     setIsLoading(true);
     setShowPreview(false);
@@ -370,6 +415,8 @@ function ReportPage() {
       }
       setReportData(response);
 
+      let resolvedPatientInfo = basePatientInfo;
+
       if (response?.patient_info) {
         const incomingGender = response.patient_info.gender;
         const normalizedGender = (() => {
@@ -388,13 +435,17 @@ function ReportPage() {
           }
           return incomingGender;
         })();
-        setPatientInfo((prev) => ({
-          ...prev,
+        resolvedPatientInfo = {
+          ...resolvedPatientInfo,
           ...response.patient_info,
-          age: String(response.patient_info.age ?? prev.age ?? ""),
+          age: String(
+            response.patient_info.age ?? resolvedPatientInfo.age ?? ""
+          ),
           gender: normalizedGender,
-        }));
+        };
       }
+
+      setPatientInfo(resolvedPatientInfo);
 
       const positive = Array.isArray(response?.positive_findings)
         ? response.positive_findings
@@ -423,10 +474,42 @@ function ReportPage() {
         setConfidenceScore(derivedConfidence);
       }
 
+      updateUploadData({
+        file,
+        fileName,
+        originalImage,
+        previewUrl: uploadData.previewUrl ?? originalImage,
+        heatmapImage: effectiveHeatmap,
+        disease: derivedFocus
+          ? findDiseaseByName(derivedFocus) ?? initialDisease
+          : initialDisease,
+        confidence:
+          typeof derivedConfidence === "number" &&
+          !Number.isNaN(derivedConfidence)
+            ? derivedConfidence
+            : confidenceScore,
+        predictions: response?.predictions ?? initialPredictions ?? null,
+        positiveFindings: positive,
+        predictionSummary: summary,
+        topFinding: derivedFocus,
+        report: response?.report ?? reportContent,
+        patientInfo: resolvedPatientInfo,
+      });
+
       setGeneratedAt(new Date());
+      showPopup({
+        title: "Report ready",
+        message: "Download your Clarity PDF or continue reviewing findings.",
+        variant: "success",
+      });
     } catch (error) {
       console.error("Report generation failed", error);
       setApiError(error.message ?? "Unable to generate the report.");
+      showPopup({
+        title: "Report generation failed",
+        message: error.message ?? "Unable to generate the report.",
+        variant: "danger",
+      });
     } finally {
       setIsLoading(false);
     }
@@ -611,7 +694,66 @@ function ReportPage() {
           <PrimaryNav onNavigate={handleNavigation} maxWidthClass="max-w-5xl" />
         </header>
 
-        <main className="flex-1">
+        <main className="relative flex-1">
+          {/* Decorative hero-style imagery hugging the composer panel */}
+          <motion.div
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ ...smoothTransition, delay: 0.22 }}
+            className="pointer-events-none absolute -left-24 top-60 hidden xl:block"
+          >
+            <div className="relative h-88 w-64 -rotate-6 rounded-[42px] border border-white/10 bg-white/5 p-3 shadow-[0_40px_120px_-60px_rgba(12,74,185,0.65)] backdrop-blur-3xl">
+              <div className="absolute -left-16 top-1/2 h-40 w-40 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(59,130,246,0.3),transparent_70%)] blur-3xl" />
+              <img
+                src={leftFeatureImage}
+                alt="Radiology artifacts floating beside the report preview"
+                className="relative z-10 h-full w-full rounded-[28px] border border-white/15 object-cover"
+                style={{
+                  maskImage:
+                    "radial-gradient(circle at center, rgba(0,0,0,1) 68%, rgba(0,0,0,0) 96%)",
+                  WebkitMaskImage:
+                    "radial-gradient(circle at center, rgba(0,0,0,1) 68%, rgba(0,0,0,0) 96%)",
+                  maskSize: "140% 140%",
+                  WebkitMaskSize: "140% 140%",
+                  maskRepeat: "no-repeat",
+                  WebkitMaskRepeat: "no-repeat",
+                }}
+              />
+              <span className="pointer-events-none absolute inset-0 rounded-[inherit] border border-white/8" />
+              <span className="pointer-events-none absolute -bottom-10 right-8 text-xs font-semibold uppercase tracking-[0.28em] text-cyan-200/70">
+                imaging
+              </span>
+            </div>
+          </motion.div>
+          <motion.div
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ ...smoothTransition, delay: 0.28 }}
+            className="pointer-events-none absolute -right-24 top-96 hidden xl:block"
+          >
+            <div className="relative h-96 w-68 rotate-6 rounded-[42px] border border-white/10 bg-[#120d1c]/70 p-3 shadow-[0_40px_130px_-60px_rgba(244,114,182,0.6)] backdrop-blur-3xl">
+              <div className="absolute -right-14 top-1/2 h-36 w-36 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(255,138,101,0.32),transparent_72%)] blur-3xl" />
+              <img
+                src={rightFeatureImage}
+                alt="Chest vessel scan emphasising the report context"
+                className="relative z-10 h-full w-full rounded-[28px] border border-white/12 object-cover"
+                style={{
+                  maskImage:
+                    "radial-gradient(circle at center, rgba(0,0,0,1) 66%, rgba(0,0,0,0) 96%)",
+                  WebkitMaskImage:
+                    "radial-gradient(circle at center, rgba(0,0,0,1) 66%, rgba(0,0,0,0) 96%)",
+                  maskSize: "135% 135%",
+                  WebkitMaskSize: "135% 135%",
+                  maskRepeat: "no-repeat",
+                  WebkitMaskRepeat: "no-repeat",
+                }}
+              />
+              <span className="pointer-events-none absolute inset-0 rounded-[inherit] border border-white/10" />
+              <span className="pointer-events-none absolute -top-10 left-6 text-xs font-semibold uppercase tracking-[0.28em] text-sky-200/70">
+                grad-cam
+              </span>
+            </div>
+          </motion.div>
           <motion.section
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}

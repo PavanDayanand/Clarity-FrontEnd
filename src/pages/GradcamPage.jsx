@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
 import { buttonDotClasses, primaryButtonClasses } from "../styles/ui.js";
@@ -9,6 +9,8 @@ import PrimaryNav from "../components/PrimaryNav.jsx";
 import Footer from "../components/Footer.jsx";
 import ScrollIndicator from "../components/ui/ScrollIndicator.jsx";
 import BackgroundGrid from "../components/ui/BackgroundGrid.jsx";
+import { usePopup } from "../components/ui/PopupProvider.jsx";
+import { useUpload } from "../context/UploadContext.jsx";
 
 const infoCards = [
   {
@@ -35,20 +37,47 @@ function GradcamPage() {
   const navigate = useNavigate();
   const location = useLocation();
   useScrollToTop();
-  const {
-    originalImage = "/placeholder-xray.png",
-    heatmapImage,
-    disease = defaultDisease,
-    confidence = 0.82,
-    fileName = "Uploaded study",
-  } = location.state ?? {};
+  const { showPopup } = usePopup();
+  const { uploadData } = useUpload();
+  const locationState = location.state ?? {};
+  const file = locationState.file ?? uploadData.file ?? null;
+  const originalImage =
+    locationState.originalImage ??
+    uploadData.originalImage ??
+    uploadData.previewUrl ??
+    "/placeholder-xray.png";
+  const heatmapImage =
+    locationState.heatmapImage ??
+    uploadData.heatmapImage ??
+    uploadData.previewUrl ??
+    originalImage;
+  const disease = locationState.disease ?? uploadData.disease ?? defaultDisease;
+  const confidence = locationState.confidence ?? uploadData.confidence ?? 0.82;
+  const fileName =
+    locationState.fileName ?? uploadData.fileName ?? "Uploaded study";
 
   const [viewMode, setViewMode] = useState("original");
   const [isTransitioning, setIsTransitioning] = useState(false);
   const pendingNavigation = useRef(null);
 
+  useEffect(() => {
+    if (!file) {
+      showPopup({
+        title: "Upload required",
+        message:
+          "Return to the home page and add an image to explore Grad-CAM.",
+        variant: "warning",
+      });
+      navigate("/", { replace: true });
+    }
+  }, [file, navigate, showPopup]);
+
+  if (!file) {
+    return null;
+  }
+
   const confidencePercent = useMemo(
-    () => Math.round(Math.min(Math.max(confidence, 0), 1) * 100),
+    () => Math.round(Math.min(Math.max(confidence ?? 0, 0), 1) * 100),
     [confidence]
   );
 
@@ -72,6 +101,7 @@ function GradcamPage() {
           disease,
           confidence,
           fileName,
+          file,
         },
       })
     );
@@ -278,25 +308,27 @@ function GradcamPage() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.3 }}
             transition={{ ...smoothTransition, delay: 0.15 }}
-            className="mt-14 grid gap-6 md:grid-cols-3"
+            className="relative mt-14 grid gap-6"
           >
-            {infoCards.map((card, index) => (
-              <motion.div
-                key={card.title}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, amount: 0.3 }}
-                transition={{ ...smoothTransition, delay: index * 0.08 }}
-                className="flex flex-col gap-3 rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-2xl"
-              >
-                <h3 className="text-lg font-semibold text-white">
-                  {card.title}
-                </h3>
-                <p className="text-sm leading-relaxed text-white/70">
-                  {card.body}
-                </p>
-              </motion.div>
-            ))}
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.3 }}
+              transition={{ ...smoothTransition, delay: 0.05 }}
+              className="relative flex flex-col gap-3 overflow-hidden rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-2xl"
+            >
+              <span className="pointer-events-none absolute inset-0 rounded-[inherit] border border-white/10" />
+              <h3 className="text-lg font-semibold text-white">
+                AI Report Workflow
+              </h3>
+              <p className="text-sm leading-relaxed text-white/70">
+                Our printable briefs capture predictions, Grad-CAM overlays, and
+                clinician notes in one exportable PDF. Review the insight deck,
+                modify patient details, then circulate the report to your MDT
+                channels without leaving Clarity.
+              </p>
+              <div className="pointer-events-none absolute -top-6 -left-6 h-36 w-36 rounded-full bg-[radial-gradient(circle,rgba(56,189,248,0.35),transparent_65%)] blur-3xl" />
+            </motion.div>
           </motion.section>
 
           <motion.section

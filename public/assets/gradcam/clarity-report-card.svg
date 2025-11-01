@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="420" viewBox="0 0 640 420">
+  <defs>
+    <linearGradient id="deskGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#cba47a" />
+      <stop offset="60%" stop-color="#d8b895" />
+      <stop offset="100%" stop-color="#b8895f" />
+    </linearGradient>
+    <linearGradient id="cardGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#f6f1e7" />
+      <stop offset="100%" stop-color="#e7ddcd" />
+    </linearGradient>
+    <linearGradient id="screenGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#1e90ff" />
+      <stop offset="50%" stop-color="#065fba" />
+      <stop offset="100%" stop-color="#012a5f" />
+    </linearGradient>
+    <filter id="softShadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#422e1b" flood-opacity="0.35" />
+    </filter>
+  </defs>
+  <rect x="0" y="0" width="640" height="420" fill="url(#deskGradient)" />
+  <g filter="url(#softShadow)">
+    <rect x="90" y="80" width="460" height="280" rx="24" fill="url(#cardGradient)" />
+    <rect x="130" y="126" width="220" height="160" rx="18" fill="#121a2b" opacity="0.72" />
+    <rect x="136" y="132" width="208" height="148" rx="12" fill="url(#screenGradient)" opacity="0.96" />
+    <rect x="352" y="132" width="160" height="10" rx="4" fill="#2f3b51" opacity="0.62" />
+    <rect x="352" y="152" width="146" height="10" rx="4" fill="#2f3b51" opacity="0.55" />
+    <rect x="352" y="172" width="132" height="10" rx="4" fill="#2f3b51" opacity="0.48" />
+    <rect x="352" y="210" width="180" height="8" rx="4" fill="#c5b093" opacity="0.75" />
+    <rect x="352" y="228" width="168" height="8" rx="4" fill="#c5b093" opacity="0.65" />
+    <rect x="352" y="246" width="152" height="8" rx="4" fill="#c5b093" opacity="0.55" />
+  </g>
+  <circle cx="515" cy="305" r="26" fill="#d0c2af" opacity="0.8" />
+  <circle cx="515" cy="305" r="18" fill="#c3b49e" opacity="0.8" />
+  <path d="M514.5 292c2.6 0 4.7 2.1 4.7 4.7v15.6c0 2.6-2.1 4.7-4.7 4.7-2.5 0-4.6-2-4.7-4.5l-.7-16c-.1-2.6 2-4.8 4.7-4.8z" fill="#9c8b75" opacity="0.6" />
+  <rect x="118" y="100" width="180" height="16" rx="8" fill="#151b27" opacity="0.6" />
+  <rect x="118" y="122" width="120" height="10" rx="5" fill="#151b27" opacity="0.45" />
+  <rect x="118" y="140" width="140" height="8" rx="4" fill="#151b27" opacity="0.35" />
+</svg>

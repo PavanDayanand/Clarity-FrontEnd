@@ -14,8 +14,10 @@ import PrimaryNav from "../components/PrimaryNav.jsx";
 import Footer from "../components/Footer.jsx";
 import ScrollIndicator from "../components/ui/ScrollIndicator.jsx";
 import BackgroundGrid from "../components/ui/BackgroundGrid.jsx";
+import { usePopup } from "../components/ui/PopupProvider.jsx";
 import { predictDisease } from "../api/clarityApi.js";
 import { findDiseaseByName, getTopFindings } from "../utils/diseaseLookup.js";
+import { useUpload } from "../context/UploadContext.jsx";
 
 const modelOptions = [
   {
@@ -43,16 +45,26 @@ function PredictPage() {
   const navigate = useNavigate();
   const location = useLocation();
   useScrollToTop();
-  const {
-    originalImage = "/placeholder-xray.png",
-    heatmapImage,
-    disease: initialDisease = defaultDisease,
-    confidence: initialConfidence = 0.87,
-    fileName = "Live upload preview",
-    file,
-    predictions: initialPredictions,
-    positiveFindings: initialPositiveFindings,
-  } = location.state ?? {};
+  const { uploadData, updateUploadData } = useUpload();
+  const locationState = location.state ?? {};
+  const file = locationState.file ?? uploadData.file ?? null;
+  const fileName =
+    locationState.fileName ?? uploadData.fileName ?? "Live upload preview";
+  const originalImage =
+    locationState.originalImage ??
+    uploadData.originalImage ??
+    uploadData.previewUrl ??
+    "/placeholder-xray.png";
+  const heatmapImage =
+    locationState.heatmapImage ?? uploadData.heatmapImage ?? null;
+  const initialDisease =
+    locationState.disease ?? uploadData.disease ?? defaultDisease;
+  const initialConfidence =
+    locationState.confidence ?? uploadData.confidence ?? 0.87;
+  const initialPredictions =
+    locationState.predictions ?? uploadData.predictions ?? null;
+  const initialPositiveFindings =
+    locationState.positiveFindings ?? uploadData.positiveFindings ?? [];
   const [isTransitioning, setIsTransitioning] = useState(false);
   const pendingNavigation = useRef(null);
   const [predictionData, setPredictionData] = useState(null);
@@ -69,10 +81,32 @@ function PredictPage() {
   const [progressPercent, setProgressPercent] = useState(0);
   const [modelConfidenceMap, setModelConfidenceMap] = useState({});
   const [chartView, setChartView] = useState("both");
+  const { showPopup } = usePopup();
 
   useEffect(() => {
     if (!file) {
       setIsLoading(false);
+      showPopup({
+        title: "Upload required",
+        message: "Return to the home page and add an image to continue.",
+        variant: "warning",
+      });
+      navigate("/", { replace: true });
+      return;
+    }
+
+    if (initialPredictions) {
+      setIsLoading(false);
+      setApiError(null);
+      setPredictionData(
+        (current) =>
+          current ?? {
+            predictions: initialPredictions,
+            confidence: initialConfidence,
+          }
+      );
+      setPredictionsMap(initialPredictions);
+      setPositiveFindings(initialPositiveFindings ?? []);
       return;
     }
 
@@ -93,11 +127,41 @@ function PredictPage() {
           throw new Error(data?.message ?? "Prediction request failed.");
         }
 
+        const predictions = data?.predictions ?? null;
+        const positive = Array.isArray(data?.positive_findings)
+          ? data.positive_findings
+          : [];
+        const summary = getTopFindings(positive, predictions);
+        const leadingFinding = summary[0]?.disease ?? null;
+        const derivedConfidence =
+          typeof data?.confidence === "number"
+            ? data.confidence
+            : typeof summary[0]?.probability === "number"
+            ? summary[0].probability
+            : initialConfidence;
+
         setPredictionData(data);
-        setPredictionsMap(data?.predictions ?? null);
-        setPositiveFindings(
-          Array.isArray(data?.positive_findings) ? data.positive_findings : []
-        );
+        setPredictionsMap(predictions);
+        setPositiveFindings(positive);
+        updateUploadData({
+          file,
+          fileName,
+          originalImage,
+          previewUrl: uploadData.previewUrl ?? originalImage,
+          predictions,
+          positiveFindings: positive,
+          predictionSummary: summary,
+          topFinding: leadingFinding,
+          confidence: derivedConfidence,
+          disease: leadingFinding
+            ? findDiseaseByName(leadingFinding) ?? initialDisease
+            : initialDisease,
+          heatmapImage:
+            data?.heatmap_image ??
+            data?.heatmap ??
+            uploadData.heatmapImage ??
+            null,
+        });
       })
       .catch((error) => {
         if (isCancelled) {
@@ -118,7 +182,11 @@ function PredictPage() {
     return () => {
       isCancelled = true;
     };
-  }, [file]);
+  }, [file, navigate, showPopup, updateUploadData]);
+
+  if (!file) {
+    return null;
+  }
 
   const sortedFindings = useMemo(
     () => getTopFindings(positiveFindings, predictionsMap),

@@ -22,6 +22,8 @@ import PrimaryNav from "./components/PrimaryNav.jsx";
 import Footer from "./components/Footer.jsx";
 import ScrollIndicator from "./components/ui/ScrollIndicator.jsx";
 import BackgroundGrid from "./components/ui/BackgroundGrid.jsx";
+import { usePopup } from "./components/ui/PopupProvider.jsx";
+import { useUpload } from "./context/UploadContext.jsx";
 const renderRegionIcon = (type, className = "h-5 w-5") => {
   switch (type) {
     case "india":
@@ -884,12 +886,22 @@ function App() {
   const statsRef = useRef(null);
   useScrollToTop();
   const reduceMotion = useReducedMotion();
+  const { uploadData, updateUploadData, resetUploadData } = useUpload();
   const [isDragging, setIsDragging] = useState(false);
-  const [uploadedFile, setUploadedFile] = useState(null);
-  const [previewUrl, setPreviewUrl] = useState(null);
+  const [uploadedFile, setUploadedFile] = useState(
+    () => uploadData.file ?? null
+  );
+  const [previewUrl, setPreviewUrl] = useState(
+    () => uploadData.previewUrl ?? null
+  );
   const [previewScale, setPreviewScale] = useState(100);
   const [previewRotation, setPreviewRotation] = useState(0);
-  const [confidenceScore, setConfidenceScore] = useState(randomConfidence());
+  const [confidenceScore, setConfidenceScore] = useState(() => {
+    if (typeof uploadData.confidence === "number") {
+      return uploadData.confidence;
+    }
+    return randomConfidence();
+  });
   const [spotlightBroken, setSpotlightBroken] = useState(false);
   const [activeSlide, setActiveSlide] = useState(null);
   const [isLoaderActive, setIsLoaderActive] = useState(false);
@@ -920,6 +932,7 @@ function App() {
   const loaderFooterText = loaderMessage.startsWith("Ready")
     ? "Launching experience"
     : "Clarity is preparing your workspace";
+  const { showPopup } = usePopup();
 
   useEffect(() => {
     if (activeSlide === null) return undefined;
@@ -1133,26 +1146,57 @@ function App() {
   };
 
   const handleFile = (file) => {
-    if (previewUrl) {
-      URL.revokeObjectURL(previewUrl);
-    }
-
     cancelLoader();
     setLoaderShownForUpload(false);
+    const currentPreview = previewUrl;
 
     if (!file) {
+      if (currentPreview) {
+        URL.revokeObjectURL(currentPreview);
+      }
       setUploadedFile(null);
       setPreviewUrl(null);
       setPreviewScale(100);
       setPreviewRotation(0);
+      const fallbackConfidence = randomConfidence();
+      setConfidenceScore(fallbackConfidence);
+      resetUploadData();
       return;
     }
 
+    const nextPreviewUrl = URL.createObjectURL(file);
+    const nextConfidence = randomConfidence();
+
+    if (currentPreview) {
+      URL.revokeObjectURL(currentPreview);
+    }
+
     setUploadedFile(file);
-    setPreviewUrl(URL.createObjectURL(file));
+    setPreviewUrl(nextPreviewUrl);
     setPreviewScale(100);
     setPreviewRotation(0);
-    setConfidenceScore(randomConfidence());
+    setConfidenceScore(nextConfidence);
+    updateUploadData({
+      file,
+      fileName: file.name ?? "",
+      fileSize: typeof file.size === "number" ? file.size : null,
+      previewUrl: nextPreviewUrl,
+      originalImage: nextPreviewUrl,
+      heatmapImage: null,
+      confidence: nextConfidence,
+      disease: null,
+      predictions: null,
+      positiveFindings: null,
+      predictionSummary: null,
+      topFinding: null,
+      report: null,
+      patientInfo: null,
+    });
+    showPopup({
+      title: "Image uploaded",
+      message: `${file.name ?? "Study"} is ready for analysis.`,
+      variant: "success",
+    });
   };
 
   const handleDrop = (event) => {
@@ -1170,6 +1214,12 @@ function App() {
   const handleNavigateToPredict = (view = "summary") => {
     if (!uploadedFile || isLoaderActive) {
       if (!uploadedFile) {
+        showPopup({
+          title: "Upload required",
+          message: "Add a study to unlock predictions and reports.",
+          variant: "warning",
+        });
+        handleScrollToUpload();
         return;
       }
       return;
@@ -1193,6 +1243,11 @@ function App() {
     if (featureView) {
       if (!uploadedFile) {
         handleScrollToUpload();
+        showPopup({
+          title: "Upload required",
+          message: "Add a study to unlock predictions and reports.",
+          variant: "warning",
+        });
         return;
       }
 
