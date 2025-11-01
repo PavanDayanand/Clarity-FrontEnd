@@ -20,6 +20,89 @@ import {
   resolveModelLabel,
 } from "../utils/modelUtils.js";
 
+const PLACEHOLDER_IMAGE = "/placeholder-xray.png";
+const DEFAULT_IMAGE_NAME = "clarity-upload";
+const DEFAULT_IMAGE_EXTENSION = "png";
+
+const getExtensionFromMime = (mimeType) => {
+  if (!mimeType || typeof mimeType !== "string") {
+    return DEFAULT_IMAGE_EXTENSION;
+  }
+  const parts = mimeType.split("/");
+  if (parts.length < 2) {
+    return DEFAULT_IMAGE_EXTENSION;
+  }
+  const subtype = parts[1]?.split(";")[0]?.trim().toLowerCase();
+  if (!subtype) {
+    return DEFAULT_IMAGE_EXTENSION;
+  }
+  return subtype === "jpeg" ? "jpg" : subtype;
+};
+
+const ensureImageFileName = (nameHint, mimeType) => {
+  const extension = getExtensionFromMime(mimeType);
+  if (!nameHint || typeof nameHint !== "string") {
+    return `${DEFAULT_IMAGE_NAME}.${extension}`;
+  }
+  const trimmed = nameHint.trim();
+  if (!trimmed) {
+    return `${DEFAULT_IMAGE_NAME}.${extension}`;
+  }
+  const lower = trimmed.toLowerCase();
+  if (lower.endsWith(`.${extension}`)) {
+    return trimmed;
+  }
+  if (trimmed.includes(".")) {
+    return trimmed;
+  }
+  return `${trimmed}.${extension}`;
+};
+
+const createFileFromBlob = (blob, nameHint) => {
+  if (!blob) {
+    return null;
+  }
+  const mimeType = blob.type || `image/${DEFAULT_IMAGE_EXTENSION}`;
+  const fileName = ensureImageFileName(nameHint, mimeType);
+  if (blob instanceof File) {
+    if (!blob.name) {
+      return new File([blob], fileName, { type: mimeType });
+    }
+    return blob;
+  }
+  return new File([blob], fileName, { type: mimeType });
+};
+
+const createFileFromDataUrl = (dataUrl, nameHint) => {
+  if (typeof dataUrl !== "string") {
+    return null;
+  }
+  const match = dataUrl.match(/^data:(.+?);base64,(.*)$/);
+  if (!match) {
+    return null;
+  }
+  const mimeType = match[1] || `image/${DEFAULT_IMAGE_EXTENSION}`;
+  const base64Payload = match[2] || "";
+  try {
+    const binary = atob(base64Payload);
+    const length = binary.length;
+    const bytes = new Uint8Array(length);
+    for (let index = 0; index < length; index += 1) {
+      bytes[index] = binary.charCodeAt(index);
+    }
+    return new File([bytes], ensureImageFileName(nameHint, mimeType), {
+      type: mimeType,
+    });
+  } catch {
+    return null;
+  }
+};
+
+const isRecoverableImageSource = (source) =>
+  typeof source === "string" &&
+  source.trim().length > 0 &&
+  !source.toLowerCase().includes("placeholder-xray");
+
 const reportInfoCards = [
   {
     title: "What is Report Studio?",
@@ -133,7 +216,7 @@ function ReportPage() {
     locationState.originalImage ??
     uploadData.originalImage ??
     uploadData.previewUrl ??
-    "/placeholder-xray.png";
+    PLACEHOLDER_IMAGE;
   const heatmapImage =
     locationState.heatmapImage ??
     uploadData.heatmapImage ??
@@ -404,7 +487,57 @@ function ReportPage() {
 
   const handleGenerateReport = async (event) => {
     event.preventDefault();
-    if (!file) {
+
+    let activeFile = null;
+    let resolvedImageSource = null;
+
+    if (file instanceof File) {
+      activeFile = file;
+    } else if (file instanceof Blob) {
+      activeFile = createFileFromBlob(file, fileName);
+    }
+
+    const candidateSources = Array.from(
+      new Set(
+        [
+          locationState.originalImage,
+          uploadData.originalImage,
+          uploadData.previewUrl,
+        ].filter(isRecoverableImageSource)
+      )
+    );
+
+    if (!activeFile) {
+      for (const source of candidateSources) {
+        let candidateFile = null;
+
+        if (source.startsWith("data:")) {
+          candidateFile = createFileFromDataUrl(source, fileName);
+        } else {
+          try {
+            const response = await fetch(source);
+            if (!response.ok) {
+              continue;
+            }
+            const blob = await response.blob();
+            if (!blob || !blob.size) {
+              continue;
+            }
+            candidateFile = createFileFromBlob(blob, fileName);
+          } catch {
+            continue;
+          }
+        }
+
+        if (candidateFile) {
+          activeFile = candidateFile;
+          resolvedImageSource = source;
+          break;
+        }
+      }
+    }
+
+    if (!activeFile) {
       setApiError(
         "Upload an imaging study on the home page before generating a report."
       );
@@ -427,6 +560,21 @@ function ReportPage() {
       age: String(numericAge),
     };
 
+    if (activeFile !== file) {
+      const updates = {
+        file: activeFile,
+        fileName: activeFile.name ?? fileName,
+      };
+      if (
+        resolvedImageSource &&
+        isRecoverableImageSource(resolvedImageSource)
+      ) {
+        updates.originalImage = resolvedImageSource;
+        updates.previewUrl = resolvedImageSource;
+      }
+      updateUploadData(updates);
+    }
+
     setApiError(null);
     setIsLoading(true);
     setShowPreview(false);
@@ -437,7 +585,7 @@ function ReportPage() {
 
     try {
       const response = await generateReport(
-        file,
+        activeFile,
         {
           ...patientInfo,
           age: numericAge,
@@ -516,11 +664,21 @@ function ReportPage() {
         response?.model_used ?? responseModelKey
       );
 
+      const nextOriginalImage =
+        resolvedImageSource && isRecoverableImageSource(resolvedImageSource)
+          ? resolvedImageSource
+          : originalImage;
+      const nextPreviewUrl =
+        uploadData.previewUrl ??
+        (resolvedImageSource && isRecoverableImageSource(resolvedImageSource)
+          ? resolvedImageSource
+          : originalImage);
+
       updateUploadData({
-        file,
-        fileName,
-        originalImage,
-        previewUrl: uploadData.previewUrl ?? originalImage,
+        file: activeFile,
+        fileName: activeFile.name ?? fileName,
+        originalImage: nextOriginalImage,
+        previewUrl: nextPreviewUrl,
         heatmapImage: effectiveHeatmap,
         disease: derivedFocus
           ? findDiseaseByName(derivedFocus) ?? initialDisease
@@ -1330,7 +1488,7 @@ function ReportPage() {
               onClick={() => handleNavigation("/gradcam")}
               className={primaryButtonClasses}
             >
-              <span className="text-base leading-none">↗</span>
+              <span className="text-base leading-none">↗️</span>
               <span>Review Grad-CAM</span>
               <span className={buttonDotClasses} />
             </button>

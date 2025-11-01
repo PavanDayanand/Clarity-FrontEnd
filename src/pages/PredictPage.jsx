@@ -36,6 +36,8 @@ const MODEL_STYLES = {
     gradientClass:
       "bg-linear-to-r from-cyan-200/80 via-cyan-300/80 to-blue-500/85 shadow-[0_22px_70px_-40px_rgba(59,130,246,0.9)]",
     tagTone: "text-cyan-200",
+    lineColor: "#38bdf8",
+    areaColor: "rgba(56,189,248,0.22)",
   },
   resnet152: {
     dotClass: "bg-indigo-300",
@@ -44,6 +46,8 @@ const MODEL_STYLES = {
     gradientClass:
       "bg-linear-to-r from-indigo-200/80 via-sky-400/80 to-purple-500/85 shadow-[0_22px_70px_-45px_rgba(129,140,248,0.9)]",
     tagTone: "text-indigo-200",
+    lineColor: "#a78bfa",
+    areaColor: "rgba(167,139,250,0.22)",
   },
 };
 
@@ -102,6 +106,8 @@ function PredictPage() {
   const [modelConfidenceMap, setModelConfidenceMap] = useState({});
   const [chartView, setChartView] = useState("both");
   const [modelStates, setModelStates] = useState({});
+  const [activeComparisonIndex, setActiveComparisonIndex] = useState(0);
+  const [chartHoverIndex, setChartHoverIndex] = useState(null);
   const pendingRequestsRef = useRef({});
   const seededDefaultResultRef = useRef(false);
 
@@ -478,6 +484,28 @@ function PredictPage() {
     return highlights;
   }, [modelStates]);
 
+  const activeHighlight = useMemo(() => {
+    if (!activeModelId) {
+      return null;
+    }
+
+    const highlight = modelHighlights[activeModelId];
+    if (!highlight) {
+      return null;
+    }
+
+    const label = highlight.disease?.replace(/_/g, " ") ?? null;
+    const probability =
+      typeof highlight.probability === "number"
+        ? Math.round(Math.min(Math.max(highlight.probability, 0), 1) * 100)
+        : null;
+
+    return {
+      label,
+      probability,
+    };
+  }, [activeModelId, modelHighlights]);
+
   const activeModel = useMemo(
     () => modelOptions.find((option) => option.id === activeModelId) ?? null,
     [activeModelId]
@@ -572,7 +600,7 @@ function PredictPage() {
       (a, b) => (rankingSource[b] ?? 0) - (rankingSource[a] ?? 0)
     );
 
-    return diseaseList.slice(0, 6).map((diseaseName) => {
+    return diseaseList.slice(0, 5).map((diseaseName) => {
       const entry = { label: diseaseName };
 
       MODEL_KEYS.forEach((modelKey) => {
@@ -585,6 +613,54 @@ function PredictPage() {
       return entry;
     });
   }, [activeModelId, modelStates]);
+
+  useEffect(() => {
+    if (comparisonDataset.length === 0) {
+      setActiveComparisonIndex(0);
+      return;
+    }
+
+    setActiveComparisonIndex((index) => {
+      if (index >= comparisonDataset.length) {
+        return comparisonDataset.length - 1;
+      }
+      if (index < 0) {
+        return 0;
+      }
+      return index;
+    });
+  }, [comparisonDataset]);
+
+  useEffect(() => {
+    if (comparisonDataset.length === 0) {
+      setChartHoverIndex(null);
+      return;
+    }
+
+    setChartHoverIndex((index) => {
+      if (index == null) {
+        return index;
+      }
+      if (index >= comparisonDataset.length) {
+        return comparisonDataset.length - 1;
+      }
+      if (index < 0) {
+        return 0;
+      }
+      return index;
+    });
+  }, [comparisonDataset]);
+
+  const activeComparisonEntry =
+    comparisonDataset[activeComparisonIndex] ?? null;
+
+  const effectiveComparisonIndex =
+    chartHoverIndex != null ? chartHoverIndex : activeComparisonIndex;
+
+  const effectiveComparisonEntry =
+    comparisonDataset[effectiveComparisonIndex] ??
+    activeComparisonEntry ??
+    null;
 
   const visibleChartModels = useMemo(() => {
     if (chartView === "both") {
@@ -607,6 +683,234 @@ function PredictPage() {
     ],
     []
   );
+
+  const modelAverages = useMemo(() => {
+    if (comparisonDataset.length === 0) {
+      return {};
+    }
+
+    return visibleChartModels.reduce((accumulator, model) => {
+      const total = comparisonDataset.reduce(
+        (sum, item) => sum + (item[model.id] ?? 0),
+        0
+      );
+      accumulator[model.id] =
+        comparisonDataset.length > 0 ? total / comparisonDataset.length : 0;
+      return accumulator;
+    }, {});
+  }, [comparisonDataset, visibleChartModels]);
+
+  const combinedAverage = useMemo(() => {
+    if (comparisonDataset.length === 0 || visibleChartModels.length === 0) {
+      return 0;
+    }
+
+    const total = comparisonDataset.reduce((sum, item) => {
+      const rowAverage =
+        visibleChartModels.reduce(
+          (rowSum, model) => rowSum + (item[model.id] ?? 0),
+          0
+        ) / visibleChartModels.length;
+      return sum + rowAverage;
+    }, 0);
+
+    return total / comparisonDataset.length;
+  }, [comparisonDataset, visibleChartModels]);
+
+  const effectivePeakValue = effectiveComparisonEntry
+    ? Math.max(
+        ...visibleChartModels.map(
+          (model) => effectiveComparisonEntry[model.id] ?? 0
+        )
+      )
+    : 0;
+
+  const dominantModel =
+    visibleChartModels.length >= 1 && effectiveComparisonEntry
+      ? visibleChartModels.reduce((winner, model) => {
+          const value = effectiveComparisonEntry[model.id] ?? 0;
+          if (!winner || value > winner.value) {
+            return { id: model.id, label: model.label, value };
+          }
+          return winner;
+        }, null)
+      : null;
+
+  const modelSpread =
+    visibleChartModels.length >= 2 && effectiveComparisonEntry
+      ? (effectiveComparisonEntry[visibleChartModels[0].id] ?? 0) -
+        (effectiveComparisonEntry[visibleChartModels[1].id] ?? 0)
+      : 0;
+
+  const summaryCards = useMemo(() => {
+    if (comparisonDataset.length === 0) {
+      return [];
+    }
+
+    const cards = [];
+    const spreadMagnitude = Math.abs(modelSpread);
+    const activeLabel = effectiveComparisonEntry
+      ? effectiveComparisonEntry.label.replace(/_/g, " ")
+      : "No selection";
+
+    cards.push({
+      id: "active",
+      title: "Active condition",
+      primary: activeLabel,
+      secondary:
+        effectivePeakValue > 0
+          ? `Peak ${Math.round(effectivePeakValue)}%`
+          : "Awaiting predictions",
+      tone: effectivePeakValue >= 65 ? "positive" : "neutral",
+    });
+
+    cards.push({
+      id: "combined",
+      title: "Combined average",
+      primary: `${Math.round(combinedAverage)}%`,
+      secondary: `Across top ${comparisonDataset.length} classes`,
+      tone: combinedAverage >= 55 ? "positive" : "neutral",
+    });
+
+    visibleChartModels.forEach((model) => {
+      const style = MODEL_STYLES[model.id] ?? {};
+      cards.push({
+        id: `model-${model.id}`,
+        title: model.label,
+        primary: `${Math.round(modelAverages[model.id] ?? 0)}%`,
+        secondary: "Average confidence",
+        accentClass: style.tagTone ?? "text-cyan-200",
+      });
+    });
+
+    if (visibleChartModels.length >= 2) {
+      const spreadTone =
+        spreadMagnitude < 2
+          ? "neutral"
+          : modelSpread > 0
+          ? "positive"
+          : "negative";
+
+      const leaderLabel =
+        spreadMagnitude < 0.5 || !dominantModel
+          ? "Models aligned"
+          : `${dominantModel.label.split(" ")[0]} ahead`;
+
+      cards.push({
+        id: "spread",
+        title: "Model spread",
+        primary: `${spreadMagnitude.toFixed(1)} pts`,
+        secondary: leaderLabel,
+        tone: spreadTone,
+      });
+    }
+
+    return cards.slice(0, 5);
+  }, [
+    combinedAverage,
+    comparisonDataset.length,
+    dominantModel,
+    effectiveComparisonEntry,
+    effectivePeakValue,
+    modelAverages,
+    modelSpread,
+    visibleChartModels,
+  ]);
+
+  const lineChartConfig = useMemo(() => {
+    if (comparisonDataset.length === 0) {
+      return null;
+    }
+
+    const labels = comparisonDataset.map((item) =>
+      item.label.replace(/_/g, " ")
+    );
+
+    const maxValue = Math.max(
+      100,
+      ...comparisonDataset.flatMap((item) =>
+        visibleChartModels.map((model) => item[model.id] ?? 0)
+      )
+    );
+
+    const viewWidth = 820;
+    const viewHeight = 320;
+    const margin = { top: 38, right: 40, bottom: 56, left: 64 };
+    const plotWidth = viewWidth - margin.left - margin.right;
+    const plotHeight = viewHeight - margin.top - margin.bottom;
+    const denominator = Math.max(labels.length - 1, 1);
+
+    const xPositions = labels.map(
+      (_, index) => margin.left + (plotWidth * index) / denominator
+    );
+    const xPercents = labels.map((_, index) =>
+      denominator === 0 ? 0.5 : index / denominator
+    );
+
+    const lines = visibleChartModels.map((model) => {
+      const style = MODEL_STYLES[model.id] ?? {};
+      const lineColor = style.lineColor ?? "#38bdf8";
+      const areaColor = style.areaColor ?? "rgba(56,189,248,0.22)";
+      const points = labels.map((label, index) => {
+        const clamped = Math.max(
+          0,
+          Math.min(comparisonDataset[index]?.[model.id] ?? 0, maxValue)
+        );
+        const y =
+          margin.top +
+          plotHeight * (1 - clamped / (maxValue === 0 ? 1 : maxValue));
+        return { x: xPositions[index], y, value: Math.round(clamped), label };
+      });
+
+      const linePath =
+        points.length > 0
+          ? points
+              .map(
+                (point, pointIndex) =>
+                  `${pointIndex === 0 ? "M" : "L"}${point.x},${point.y.toFixed(
+                    2
+                  )}`
+              )
+              .join(" ")
+          : "";
+
+      const areaPath =
+        points.length > 0
+          ? [
+              `M${points[0].x},${margin.top + plotHeight}`,
+              ...points.map((point) => `L${point.x},${point.y}`),
+              `L${points[points.length - 1].x},${margin.top + plotHeight}`,
+              "Z",
+            ].join(" ")
+          : "";
+
+      return { model, lineColor, areaColor, points, linePath, areaPath };
+    });
+
+    const yTicks = [];
+    const tickCount = 4;
+    for (let i = 0; i <= tickCount; i += 1) {
+      const value = Math.round((maxValue / tickCount) * i);
+      const y =
+        margin.top + plotHeight * (1 - value / (maxValue === 0 ? 1 : maxValue));
+      yTicks.push({ value, y });
+    }
+
+    return {
+      viewBox: `0 0 ${viewWidth} ${viewHeight}`,
+      width: viewWidth,
+      height: viewHeight,
+      margin,
+      plotWidth,
+      plotHeight,
+      labels,
+      xPositions,
+      xPercents,
+      lines,
+      yTicks,
+      maxValue,
+    };
+  }, [comparisonDataset, visibleChartModels]);
 
   useEffect(() => {
     setModelConfidenceMap((previous) => {
@@ -808,11 +1112,9 @@ function PredictPage() {
             <motion.p
               variants={slideBlurVariants}
               custom={0.12}
-              className="mt-6 mx-auto max-w-3xl text-base italic text-white/70 sm:text-lg"
+              className="mt-6 text-base font-medium text-white/70 sm:text-lg"
             >
-              Compare ensemble runs, preview clinician uploads, and surface the
-              most confident findings in one glance. Select a model to animate
-              the simulated inference timeline.
+              Upload an image and pick a model to review predictions instantly.
             </motion.p>
             {isLoading ? (
               <motion.p
@@ -834,7 +1136,7 @@ function PredictPage() {
             ) : null}
           </motion.section>
 
-          <div className="mx-auto mt-10 grid w-full max-w-7xl gap-10 px-6 sm:mt-12 sm:px-16 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
+          <div className="mx-auto mt-10 grid w-full max-w-7xl items-start gap-10 px-6 sm:mt-12 sm:px-16 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
             <motion.section
               {...revealProps}
               custom={0.05}
@@ -853,22 +1155,14 @@ function PredictPage() {
                   {fileName}
                 </span>
               </motion.div>
-              <motion.p
-                variants={slideBlurVariants}
-                custom={0.12}
-                className="mt-4 text-sm text-white/65 sm:text-base"
-              >
-                The source image anchors all downstream insight. Hover to
-                preview full fidelity without leaving the workspace.
-              </motion.p>
-              <div className="group relative mt-6 aspect-4/5 w-full overflow-hidden rounded-[28px] border border-white/8 bg-[#020916]/90 shadow-[0_60px_140px_-80px_rgba(15,118,255,0.6)]">
+              <div className="group relative mt-6 flex w-full items-center justify-center overflow-hidden rounded-[28px] border border-white/8 bg-[#020916]/90 shadow-[0_60px_140px_-80px_rgba(15,118,255,0.6)]">
                 <motion.img
                   initial={{ opacity: 0, scale: 0.98 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ ...smoothTransition, delay: 0.08 }}
                   src={originalImage}
                   alt="Uploaded radiograph"
-                  className="h-full w-full object-contain"
+                  className="w-full object-contain"
                   loading="lazy"
                 />
                 <button
@@ -909,6 +1203,38 @@ function PredictPage() {
                   Open preview
                 </button>
               </motion.div>
+              {activeHighlight ? (
+                <motion.div
+                  variants={slideBlurVariants}
+                  custom={0.22}
+                  className="mt-6 rounded-[22px] border border-white/10 bg-[#07132a]/80 px-5 py-4 text-left shadow-[0_35px_90px_-60px_rgba(37,99,235,0.45)]"
+                >
+                  <p className="text-[0.65rem] font-semibold uppercase tracking-[0.32em] text-white/45">
+                    Current top class
+                  </p>
+                  <div className="mt-3 flex items-baseline justify-between gap-4">
+                    <h3 className="text-lg font-semibold text-white/90 sm:text-xl">
+                      {activeHighlight.label ?? "Pending"}
+                    </h3>
+                    <span className="text-2xl font-semibold text-cyan-200">
+                      {activeHighlight.probability != null
+                        ? `${activeHighlight.probability}%`
+                        : "--"}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-xs text-white/55 sm:text-sm">
+                    Updated when you switch models.
+                  </p>
+                </motion.div>
+              ) : (
+                <motion.div
+                  variants={slideBlurVariants}
+                  custom={0.22}
+                  className="mt-6 rounded-[22px] border border-white/10 bg-[#07132a]/60 px-5 py-4 text-left text-sm text-white/55 shadow-[0_35px_90px_-60px_rgba(37,99,235,0.35)]"
+                >
+                  Run a model to surface the leading class and confidence.
+                </motion.div>
+              )}
             </motion.section>
 
             <div className="flex flex-col gap-8">
@@ -1023,14 +1349,11 @@ function PredictPage() {
                           <h3 className="text-xl font-semibold text-white/90">
                             {option.label}
                           </h3>
-                          {option.tagline ? (
-                            <p className="mt-1 text-xs font-semibold uppercase tracking-[0.28em] text-white/45">
-                              {option.tagline}
+                          {!hasResult ? (
+                            <p className="mt-2 text-sm text-white/70">
+                              Select to run predictions.
                             </p>
                           ) : null}
-                          <p className="mt-3 text-sm text-white/60">
-                            {option.summary}
-                          </p>
                         </div>
                         <div className="flex items-center justify-between text-xs text-white/55">
                           <span className={style.tagTone ?? "text-white/60"}>
@@ -1191,13 +1514,13 @@ function PredictPage() {
                 <div>
                   <h2 className="text-2xl font-semibold sm:text-[2rem]">
                     <span className={heroGradientClass}>
-                      Model comparison graph
+                      Model comparison funnel
                     </span>
                   </h2>
                   <p className="mt-4 max-w-2xl text-sm italic text-white/65 sm:text-base">
-                    Hover the bars to inspect how each architecture rates the
-                    top suspected conditions. Toggle between individual or
-                    combined views to isolate behaviour.
+                    Hover the rows or funnel layers to inspect how each
+                    architecture ranks the top five suspected conditions. Toggle
+                    between individual or combined views to isolate behaviour.
                   </p>
                 </div>
                 <div className="inline-flex rounded-full border border-white/12 bg-white/10 p-1 text-xs font-semibold text-white/60">
@@ -1222,90 +1545,424 @@ function PredictPage() {
                 custom={0.3}
                 className="mt-8 rounded-[40px] border border-white/10 bg-[#060f23]/85 px-8 py-10 shadow-[0_70px_180px_-90px_rgba(37,99,235,0.55)]"
               >
-                <div className="flex flex-wrap items-center gap-5 text-[0.7rem] uppercase tracking-[0.32em] text-white/45">
-                  {visibleChartModels.map((model) => {
-                    const style = MODEL_STYLES[model.id] ?? {};
-                    return (
-                      <span
-                        key={model.id}
-                        className="inline-flex items-center gap-2"
-                      >
-                        <span
-                          className={`h-2.5 w-2.5 rounded-full ${
-                            style.dotClass ?? "bg-cyan-300"
-                          }`}
-                        />
-                        {model.label}
-                      </span>
-                    );
-                  })}
-                </div>
-                <div className="mt-6 flex flex-col gap-6">
-                  {comparisonDataset.length === 0 ? (
-                    <p className="text-sm text-white/55">
-                      Run inference to populate the model comparison graph.
-                    </p>
-                  ) : (
-                    comparisonDataset.map((item) => {
-                      const modelValues = visibleChartModels.map(
-                        (model) => item[model.id] ?? 0
-                      );
-                      const peakValue =
-                        modelValues.length > 0 ? Math.max(...modelValues) : 0;
+                {comparisonDataset.length === 0 ? (
+                  <p className="text-sm text-white/55">
+                    Run inference to populate the model comparison graph.
+                  </p>
+                ) : (
+                  <>
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+                      {summaryCards.map((card) => {
+                        const toneClass =
+                          card.accentClass ??
+                          (card.tone === "positive"
+                            ? "text-emerald-300"
+                            : card.tone === "negative"
+                            ? "text-rose-300"
+                            : "text-white");
+                        const glowClass =
+                          card.tone === "positive"
+                            ? "shadow-[0_40px_120px_-90px_rgba(16,185,129,0.6)]"
+                            : card.tone === "negative"
+                            ? "shadow-[0_40px_120px_-90px_rgba(239,68,68,0.6)]"
+                            : "shadow-[0_35px_110px_-90px_rgba(37,99,235,0.55)]";
 
-                      return (
-                        <div key={item.label} className="space-y-3">
-                          <div className="flex items-center justify-between text-sm text-white/70">
-                            <span className="truncate text-white/80">
-                              {item.label}
-                            </span>
-                            <span className="text-white/55">
-                              {chartView === "both"
-                                ? `${peakValue}% peak`
-                                : `${peakValue}% confidence`}
-                            </span>
+                        return (
+                          <div
+                            key={card.id}
+                            className={`relative overflow-hidden rounded-3xl border border-white/10 bg-[#081227]/85 px-5 py-6 backdrop-blur ${glowClass}`}
+                          >
+                            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,#13295a_0%,transparent_70%)] opacity-75" />
+                            <div className="relative flex flex-col gap-3">
+                              <span className="text-[0.65rem] uppercase tracking-[0.3em] text-white/45">
+                                {card.title}
+                              </span>
+                              <span
+                                className={`text-2xl font-semibold ${toneClass}`}
+                              >
+                                {card.primary}
+                              </span>
+                              <span className="text-sm text-white/60">
+                                {card.secondary}
+                              </span>
+                            </div>
                           </div>
-                          <div className="grid gap-2">
+                        );
+                      })}
+                    </div>
+                    <div className="mt-10">
+                      <div className="relative overflow-hidden rounded-4xl border border-white/10 bg-[#050b19]/85 px-6 pb-12 pt-8 shadow-[0_70px_160px_-90px_rgba(37,99,235,0.6)]">
+                        <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+                          <span className="text-[0.7rem] uppercase tracking-[0.3em] text-white/45">
+                            Confidence trajectory
+                          </span>
+                          <div className="flex flex-wrap items-center gap-5 text-[0.7rem] uppercase tracking-[0.28em] text-white/45">
                             {visibleChartModels.map((model) => {
-                              const value = Math.max(
-                                0,
-                                Math.min(item[model.id] ?? 0, 100)
-                              );
-                              const widthPercent =
-                                value === 0 ? 0 : Math.max(1, value);
                               const style = MODEL_STYLES[model.id] ?? {};
-
                               return (
-                                <div
-                                  key={`${item.label}-${model.id}`}
-                                  className={`group relative h-10 overflow-hidden rounded-2xl border ${
-                                    style.borderClass ?? "border-white/10"
-                                  } ${style.backgroundClass ?? "bg-white/5"}`}
+                                <span
+                                  key={model.id}
+                                  className="flex items-center gap-2"
                                 >
-                                  <div
-                                    className={`absolute inset-y-1 left-1 rounded-[18px] ${
-                                      style.gradientClass ?? "bg-white/50"
-                                    } transition-all duration-500`}
-                                    style={{ width: `${widthPercent}%` }}
-                                  >
-                                    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-black/35 px-3 py-1 text-[0.7rem] font-semibold text-white opacity-0 backdrop-blur-sm transition group-hover:opacity-100">
-                                      {value}%
-                                    </span>
-                                  </div>
-                                  {chartView === "both" ? (
-                                    <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[0.65rem] font-semibold uppercase tracking-[0.22em] text-white/45 opacity-0 transition group-hover:opacity-100">
-                                      {model.label}
-                                    </span>
-                                  ) : null}
-                                </div>
+                                  <span
+                                    className="h-2.5 w-2.5 rounded-full"
+                                    style={{
+                                      backgroundColor:
+                                        style.lineColor ?? "#38bdf8",
+                                    }}
+                                  />
+                                  {model.label}
+                                </span>
                               );
                             })}
                           </div>
                         </div>
-                      );
-                    })
-                  )}
-                </div>
+                        {lineChartConfig ? (
+                          <div className="relative">
+                            <svg
+                              viewBox={lineChartConfig.viewBox}
+                              className="h-80 w-full"
+                              preserveAspectRatio="none"
+                              role="img"
+                              aria-label="Model confidence comparison chart"
+                              onMouseLeave={() => setChartHoverIndex(null)}
+                            >
+                              <defs>
+                                <linearGradient
+                                  id="chart-background-gradient"
+                                  x1="0"
+                                  y1="0"
+                                  x2="0"
+                                  y2="1"
+                                >
+                                  <stop
+                                    offset="0%"
+                                    stopColor="rgba(12,24,52,0.95)"
+                                  />
+                                  <stop
+                                    offset="100%"
+                                    stopColor="rgba(5,11,25,0.95)"
+                                  />
+                                </linearGradient>
+                              </defs>
+                              <rect
+                                x="0"
+                                y="0"
+                                width={lineChartConfig.width}
+                                height={lineChartConfig.height}
+                                fill="url(#chart-background-gradient)"
+                              />
+                              <g>
+                                {lineChartConfig.yTicks.map((tick, index) => (
+                                  <g key={`y-${index}`}>
+                                    <line
+                                      x1={lineChartConfig.margin.left}
+                                      x2={
+                                        lineChartConfig.width -
+                                        lineChartConfig.margin.right
+                                      }
+                                      y1={tick.y}
+                                      y2={tick.y}
+                                      stroke="rgba(148,197,255,0.18)"
+                                      strokeDasharray="6 6"
+                                    />
+                                    <text
+                                      x={lineChartConfig.margin.left - 18}
+                                      y={tick.y + 4}
+                                      textAnchor="end"
+                                      fontSize="12"
+                                      fill="rgba(226,232,240,0.55)"
+                                    >
+                                      {tick.value}
+                                    </text>
+                                  </g>
+                                ))}
+                              </g>
+                              <line
+                                x1={lineChartConfig.margin.left}
+                                x2={lineChartConfig.margin.left}
+                                y1={lineChartConfig.margin.top}
+                                y2={
+                                  lineChartConfig.height -
+                                  lineChartConfig.margin.bottom
+                                }
+                                stroke="rgba(148,197,255,0.28)"
+                              />
+                              <line
+                                x1={lineChartConfig.margin.left}
+                                x2={
+                                  lineChartConfig.width -
+                                  lineChartConfig.margin.right
+                                }
+                                y1={
+                                  lineChartConfig.height -
+                                  lineChartConfig.margin.bottom
+                                }
+                                y2={
+                                  lineChartConfig.height -
+                                  lineChartConfig.margin.bottom
+                                }
+                                stroke="rgba(148,197,255,0.28)"
+                              />
+                              {effectiveComparisonIndex != null &&
+                              effectiveComparisonIndex <
+                                lineChartConfig.xPositions.length ? (
+                                <line
+                                  x1={
+                                    lineChartConfig.xPositions[
+                                      effectiveComparisonIndex
+                                    ]
+                                  }
+                                  x2={
+                                    lineChartConfig.xPositions[
+                                      effectiveComparisonIndex
+                                    ]
+                                  }
+                                  y1={lineChartConfig.margin.top - 6}
+                                  y2={
+                                    lineChartConfig.height -
+                                    lineChartConfig.margin.bottom +
+                                    10
+                                  }
+                                  stroke="rgba(148,197,255,0.35)"
+                                  strokeDasharray="4 6"
+                                />
+                              ) : null}
+                              {lineChartConfig.lines.map((line) => (
+                                <g key={`line-${line.model.id}`}>
+                                  <path
+                                    d={line.areaPath}
+                                    fill={line.areaColor}
+                                    opacity={chartView === "both" ? 0.22 : 0.3}
+                                  />
+                                  <path
+                                    d={line.linePath}
+                                    fill="none"
+                                    stroke={line.lineColor}
+                                    strokeWidth={3.5}
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    opacity={chartView === "both" ? 0.9 : 1}
+                                  />
+                                  {line.points.map((point, pointIndex) => {
+                                    const isFocused =
+                                      pointIndex === effectiveComparisonIndex;
+                                    return (
+                                      <circle
+                                        key={`point-${line.model.id}-${pointIndex}`}
+                                        cx={point.x}
+                                        cy={point.y}
+                                        r={isFocused ? 6 : 4}
+                                        fill={line.lineColor}
+                                        stroke="#0f172a"
+                                        strokeWidth={2.2}
+                                        className="cursor-pointer transition-transform duration-200"
+                                        tabIndex={0}
+                                        onMouseEnter={() =>
+                                          setChartHoverIndex(pointIndex)
+                                        }
+                                        onFocus={() =>
+                                          setChartHoverIndex(pointIndex)
+                                        }
+                                        onClick={() => {
+                                          setActiveComparisonIndex(pointIndex);
+                                          setChartHoverIndex(null);
+                                        }}
+                                        onKeyDown={(event) => {
+                                          if (
+                                            event.key === "Enter" ||
+                                            event.key === " "
+                                          ) {
+                                            event.preventDefault();
+                                            setActiveComparisonIndex(
+                                              pointIndex
+                                            );
+                                            setChartHoverIndex(null);
+                                          }
+                                        }}
+                                      />
+                                    );
+                                  })}
+                                </g>
+                              ))}
+                              <g>
+                                {lineChartConfig.labels.map((label, index) => (
+                                  <text
+                                    key={`x-${label}`}
+                                    x={lineChartConfig.xPositions[index]}
+                                    y={
+                                      lineChartConfig.height -
+                                      lineChartConfig.margin.bottom +
+                                      28
+                                    }
+                                    textAnchor="middle"
+                                    fontSize="12"
+                                    fill="rgba(226,232,240,0.65)"
+                                  >
+                                    {label}
+                                  </text>
+                                ))}
+                              </g>
+                            </svg>
+                            {effectiveComparisonEntry &&
+                            effectiveComparisonIndex != null &&
+                            effectiveComparisonIndex <
+                              lineChartConfig.xPercents.length ? (
+                              <div
+                                className="pointer-events-none absolute top-4 flex -translate-x-1/2 flex-col gap-2 rounded-3xl border border-white/10 bg-[#0b1737]/90 px-4 py-3 text-xs text-white/70 shadow-[0_25px_60px_-40px_rgba(37,99,235,0.75)] backdrop-blur"
+                                style={{
+                                  left: `${
+                                    lineChartConfig.xPercents[
+                                      effectiveComparisonIndex
+                                    ] * 100
+                                  }%`,
+                                }}
+                              >
+                                <span className="text-[0.7rem] uppercase tracking-[0.26em] text-white/45">
+                                  {effectiveComparisonEntry.label.replace(
+                                    /_/g,
+                                    " "
+                                  )}
+                                </span>
+                                <div className="flex flex-col gap-1 text-sm text-white/75">
+                                  {visibleChartModels.map((model) => (
+                                    <span
+                                      key={`tooltip-${model.id}`}
+                                      className="flex items-center justify-between gap-4"
+                                    >
+                                      <span className="flex items-center gap-2">
+                                        <span
+                                          className="h-2 w-2 rounded-full"
+                                          style={{
+                                            backgroundColor:
+                                              MODEL_STYLES[model.id]
+                                                ?.lineColor ?? "#38bdf8",
+                                          }}
+                                        />
+                                        {model.label}
+                                      </span>
+                                      <span className="font-semibold">
+                                        {Math.round(
+                                          effectiveComparisonEntry[model.id] ??
+                                            0
+                                        )}
+                                        %
+                                      </span>
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            ) : null}
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                    <div className="mt-10 overflow-hidden rounded-4xl border border-white/10 bg-[#060f23]/75">
+                      <div className="px-6 py-4">
+                        <div className="flex items-center gap-4 text-[0.65rem] uppercase tracking-[0.26em] text-white/45">
+                          <span className="flex-1">Condition</span>
+                          {visibleChartModels.map((model) => (
+                            <span
+                              key={`header-${model.id}`}
+                              className="w-24 text-right"
+                            >
+                              {model.label.split(" ")[0]}
+                            </span>
+                          ))}
+                          <span className="w-16 text-right">Peak</span>
+                        </div>
+                      </div>
+                      <div className="divide-y divide-white/5">
+                        {comparisonDataset.map((item, index) => {
+                          const isActive = index === effectiveComparisonIndex;
+                          const peakValue = Math.max(
+                            ...visibleChartModels.map(
+                              (model) => item[model.id] ?? 0
+                            )
+                          );
+
+                          return (
+                            <button
+                              key={`row-${item.label}`}
+                              type="button"
+                              onMouseEnter={() => setChartHoverIndex(index)}
+                              onFocus={() => setChartHoverIndex(index)}
+                              onMouseLeave={() => setChartHoverIndex(null)}
+                              onBlur={() => setChartHoverIndex(null)}
+                              onClick={() => {
+                                setActiveComparisonIndex(index);
+                                setChartHoverIndex(null);
+                              }}
+                              className={`flex w-full items-center gap-4 px-6 py-4 text-left transition ${
+                                isActive
+                                  ? "bg-white/10 text-white shadow-[0_35px_90px_-80px_rgba(56,189,248,0.6)]"
+                                  : "text-white/70 hover:bg-white/5 hover:text-white"
+                              }`}
+                            >
+                              <span className="flex-1 text-sm font-semibold">
+                                {item.label.replace(/_/g, " ")}
+                              </span>
+                              {visibleChartModels.map((model) => (
+                                <span
+                                  key={`row-${item.label}-${model.id}`}
+                                  className="w-24 text-right text-sm font-semibold"
+                                >
+                                  {Math.round(item[model.id] ?? 0)}%
+                                </span>
+                              ))}
+                              <span className="w-16 text-right text-sm font-semibold text-white/80">
+                                {Math.round(peakValue)}%
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    {effectiveComparisonEntry ? (
+                      <div className="mt-8 rounded-3xl border border-white/10 bg-[#0b1633]/80 p-6 text-sm text-white/65 sm:text-base">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <h4 className="text-lg font-semibold text-white/85">
+                            {effectiveComparisonEntry.label.replace(/_/g, " ")}
+                          </h4>
+                          <span className="text-sm font-semibold text-cyan-200">
+                            Peak{" "}
+                            {Math.max(
+                              ...visibleChartModels.map(
+                                (model) =>
+                                  effectiveComparisonEntry[model.id] ?? 0
+                              )
+                            )}
+                            %
+                          </span>
+                        </div>
+                        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                          {visibleChartModels.map((model) => {
+                            const value = Math.max(
+                              0,
+                              Math.min(
+                                effectiveComparisonEntry[model.id] ?? 0,
+                                100
+                              )
+                            );
+                            return (
+                              <div
+                                key={`detail-${model.id}`}
+                                className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3"
+                              >
+                                <span className="font-semibold text-white/85">
+                                  {model.label}
+                                </span>
+                                <span className="text-sm font-semibold text-white/75">
+                                  {value}%
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : null}
+                  </>
+                )}
               </motion.div>
             </motion.div>
           </motion.section>

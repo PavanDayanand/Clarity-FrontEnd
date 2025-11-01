@@ -100,6 +100,9 @@ export const generateReport = async (
   patientInfo,
   { model = "densenet121", signal } = {}
 ) => {
+  if (!file) {
+    throw new Error("A diagnostic image is required to generate a report.");
+  }
   const formData = toFormData({
     file,
     name: patientInfo?.name,
@@ -122,25 +125,31 @@ export const generateReport = async (
 export const getAvailableLayers = async (modelName, { signal } = {}) => {
   const resolvedModel = modelName ?? "densenet121";
   const encodedModel = encodeURIComponent(resolvedModel);
-  const response = await fetch(`${API_BASE_URL}/config/layers/${encodedModel}`, {
-    method: "GET",
-    headers: {
-      Accept: "application/json, text/plain, */*",
-    },
-    signal,
-  });
+  const response = await fetch(
+    `${API_BASE_URL}/config/layers/${encodedModel}`,
+    {
+      method: "GET",
+      headers: {
+        Accept: "application/json, text/plain, */*",
+      },
+      signal,
+    }
+  );
   return handleResponse(response);
 };
 
 export const getAvailableMethods = async (modelName, { signal } = {}) => {
   const resolvedModel = modelName ?? "densenet121";
   const encodedModel = encodeURIComponent(resolvedModel);
-  const response = await fetch(`${API_BASE_URL}/config/methods/${encodedModel}`, {
-    method: "GET",
-    headers: {
-      Accept: "application/json, text/plain, */*",
-    },
-    signal,
-  });
+  const response = await fetch(
+    `${API_BASE_URL}/config/methods/${encodedModel}`,
+    {
+      method: "GET",
+      headers: {
+        Accept: "application/json, text/plain, */*",
+      },
+      signal,
+    }
+  );
   return handleResponse(response);
 };
