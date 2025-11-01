@@ -534,7 +534,7 @@ function PredictPage() {
             ) : null}
           </motion.section>
 
-          <div className="mx-auto mt-12 grid w-full max-w-7xl gap-10 px-6 sm:px-16 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
+          <div className="mx-auto mt-10 grid w-full max-w-7xl gap-10 px-6 sm:mt-12 sm:px-16 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
             <motion.section
               {...revealProps}
               custom={0.05}

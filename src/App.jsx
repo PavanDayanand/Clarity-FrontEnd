@@ -939,14 +939,6 @@ function App() {
   }, [activeSlide]);
 
   useEffect(() => {
-    return () => {
-      if (previewUrl) {
-        URL.revokeObjectURL(previewUrl);
-      }
-    };
-  }, [previewUrl]);
-
-  useEffect(() => {
     if (location.hash === "#about") {
       aboutRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     }

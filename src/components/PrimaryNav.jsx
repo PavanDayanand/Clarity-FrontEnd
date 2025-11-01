@@ -134,7 +134,7 @@ export default function PrimaryNav({
     hoverTimer.current = setTimeout(() => {
       setFeaturesOpen(false);
       hoverTimer.current = null;
-    }, 360);
+    }, 520);
   };
 
   useEffect(() => () => clearHoverTimer(), []);
@@ -191,7 +191,6 @@ export default function PrimaryNav({
             <div className="relative flex items-center">
               <motion.button
                 type="button"
-                onMouseEnter={openFeatures}
                 onFocus={openFeatures}
                 onClick={() => setFeaturesOpen((prev) => !prev)}
                 aria-haspopup="true"
@@ -206,7 +205,7 @@ export default function PrimaryNav({
                   viewBox="0 0 24 24"
                   className="h-4 w-4"
                   animate={{ rotate: featuresOpen ? 180 : 0 }}
-                  transition={{ type: "spring", stiffness: 260, damping: 20 }}
+                  transition={{ duration: 0.5, ease: [0.25, 0.9, 0.3, 1] }}
                 >
                   <path
                     fill="currentColor"
@@ -256,13 +255,13 @@ export default function PrimaryNav({
             <motion.div
               key="feature-drawer"
               layout
-              initial={{ opacity: 0, y: -16 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -18 }}
+              initial={{ opacity: 0, y: -16, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -14, scale: 0.98 }}
               transition={{
-                duration: 0.6,
-                ease: [0.18, 0.93, 0.3, 1],
-                layout: { duration: 0.75, ease: [0.18, 0.93, 0.3, 1] },
+                duration: 0.5,
+                ease: [0.3, 0.9, 0.35, 1],
+                layout: { duration: 0.5, ease: [0.25, 0.9, 0.35, 1] },
               }}
               className="hidden w-full grid-cols-1 gap-4 rounded-[28px] border border-white/10 bg-[#07132f]/92 p-5 shadow-[0_30px_60px_-32px_rgba(10,35,80,0.85)] backdrop-blur-[26px] md:grid md:grid-cols-3"
               onMouseEnter={openFeatures}
