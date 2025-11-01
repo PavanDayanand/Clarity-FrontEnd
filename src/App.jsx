@@ -1183,6 +1183,10 @@ function App() {
       previewUrl: nextPreviewUrl,
       originalImage: nextPreviewUrl,
       heatmapImage: null,
+      heatmapMethod: null,
+      heatmapLayer: null,
+      heatmapTopDisease: null,
+      heatmapTopProbability: null,
       confidence: nextConfidence,
       disease: null,
       predictions: null,
@@ -1191,6 +1195,8 @@ function App() {
       topFinding: null,
       report: null,
       patientInfo: null,
+      modelKey: null,
+      modelDisplayName: null,
     });
     showPopup({
       title: "Image uploaded",

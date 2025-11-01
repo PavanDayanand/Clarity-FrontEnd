@@ -14,6 +14,11 @@ import { generateReport } from "../api/clarityApi.js";
 import { findDiseaseByName, getTopFindings } from "../utils/diseaseLookup.js";
 import { usePopup } from "../components/ui/PopupProvider.jsx";
 import { useUpload } from "../context/UploadContext.jsx";
+import {
+  DEFAULT_MODEL_KEY,
+  resolveModelKey,
+  resolveModelLabel,
+} from "../utils/modelUtils.js";
 
 const reportInfoCards = [
   {
@@ -134,6 +139,26 @@ function ReportPage() {
     uploadData.heatmapImage ??
     uploadData.previewUrl ??
     null;
+  const heatmapMethod =
+    locationState.heatmapMethod ?? uploadData.heatmapMethod ?? null;
+  const heatmapLayer =
+    locationState.heatmapLayer ?? uploadData.heatmapLayer ?? null;
+  const heatmapTopDisease =
+    locationState.heatmapTopDisease ?? uploadData.heatmapTopDisease ?? null;
+  const heatmapTopProbability =
+    locationState.heatmapTopProbability ??
+    uploadData.heatmapTopProbability ??
+    null;
+  const modelKey = resolveModelKey(
+    locationState.modelKey ??
+      uploadData.modelKey ??
+      locationState.modelDisplayName ??
+      uploadData.modelDisplayName ??
+      DEFAULT_MODEL_KEY
+  );
+  const modelLabel = resolveModelLabel(
+    locationState.modelDisplayName ?? uploadData.modelDisplayName ?? modelKey
+  );
   const initialDisease =
     locationState.disease ?? uploadData.disease ?? defaultDisease;
   const initialConfidence =
@@ -351,6 +376,12 @@ function ReportPage() {
       topFinding: focusDiseaseName,
       report: reportData?.report ?? reportContent,
       patientInfo,
+      modelKey,
+      modelDisplayName: modelLabel,
+      heatmapMethod,
+      heatmapLayer,
+      heatmapTopDisease,
+      heatmapTopProbability,
     };
     pendingNavigation.current = () => {
       navigate(path, { state: navState });
@@ -405,11 +436,15 @@ function ReportPage() {
     hasShownDownloadPromptRef.current = false;
 
     try {
-      const response = await generateReport(file, {
-        ...patientInfo,
-        age: numericAge,
-        gender: patientInfo.gender,
-      });
+      const response = await generateReport(
+        file,
+        {
+          ...patientInfo,
+          age: numericAge,
+          gender: patientInfo.gender,
+        },
+        { model: modelKey }
+      );
       if (response?.success === false) {
         throw new Error(response?.message ?? "Report generation failed.");
       }
@@ -474,6 +509,13 @@ function ReportPage() {
         setConfidenceScore(derivedConfidence);
       }
 
+      const responseModelKey = resolveModelKey(
+        response?.model_used ?? modelKey
+      );
+      const responseModelLabel = resolveModelLabel(
+        response?.model_used ?? responseModelKey
+      );
+
       updateUploadData({
         file,
         fileName,
@@ -494,6 +536,8 @@ function ReportPage() {
         topFinding: derivedFocus,
         report: response?.report ?? reportContent,
         patientInfo: resolvedPatientInfo,
+        modelKey: responseModelKey,
+        modelDisplayName: responseModelLabel,
       });
 
       setGeneratedAt(new Date());

@@ -15,6 +15,10 @@ const initialState = {
   previewUrl: null,
   originalImage: null,
   heatmapImage: null,
+  heatmapMethod: null,
+  heatmapLayer: null,
+  heatmapTopDisease: null,
+  heatmapTopProbability: null,
   confidence: null,
   disease: null,
   predictions: null,
@@ -23,6 +27,8 @@ const initialState = {
   topFinding: null,
   report: null,
   patientInfo: null,
+  modelKey: null,
+  modelDisplayName: null,
 };
 
 export function UploadProvider({ children }) {

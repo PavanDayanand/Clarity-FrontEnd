@@ -10,7 +10,17 @@ import Footer from "../components/Footer.jsx";
 import ScrollIndicator from "../components/ui/ScrollIndicator.jsx";
 import BackgroundGrid from "../components/ui/BackgroundGrid.jsx";
 import { usePopup } from "../components/ui/PopupProvider.jsx";
+import {
+  generateHeatmap,
+  getAvailableLayers,
+  getAvailableMethods,
+} from "../api/clarityApi.js";
 import { useUpload } from "../context/UploadContext.jsx";
+import {
+  DEFAULT_MODEL_KEY,
+  resolveModelKey,
+  resolveModelLabel,
+} from "../utils/modelUtils.js";
 
 const infoCards = [
   {
@@ -32,13 +42,14 @@ const infoCards = [
 ];
 
 const smoothTransition = { duration: 0.7, ease: [0.16, 1, 0.3, 1] };
+const DEFAULT_HEATMAP_METHOD = "gradcam";
 
 function GradcamPage() {
   const navigate = useNavigate();
   const location = useLocation();
   useScrollToTop();
   const { showPopup } = usePopup();
-  const { uploadData } = useUpload();
+  const { uploadData, updateUploadData } = useUpload();
   const locationState = location.state ?? {};
   const file = locationState.file ?? uploadData.file ?? null;
   const originalImage =
@@ -46,15 +57,49 @@ function GradcamPage() {
     uploadData.originalImage ??
     uploadData.previewUrl ??
     "/placeholder-xray.png";
-  const heatmapImage =
+  const initialHeatmapImage =
     locationState.heatmapImage ??
     uploadData.heatmapImage ??
     uploadData.previewUrl ??
     originalImage;
+  const [heatmapImage, setHeatmapImage] = useState(initialHeatmapImage);
   const disease = locationState.disease ?? uploadData.disease ?? defaultDisease;
   const confidence = locationState.confidence ?? uploadData.confidence ?? 0.82;
   const fileName =
     locationState.fileName ?? uploadData.fileName ?? "Uploaded study";
+  const predictions =
+    locationState.predictions ?? uploadData.predictions ?? null;
+  const positiveFindings =
+    locationState.positiveFindings ?? uploadData.positiveFindings ?? [];
+  const modelKey = resolveModelKey(
+    locationState.modelKey ??
+      uploadData.modelKey ??
+      uploadData.modelDisplayName ??
+      DEFAULT_MODEL_KEY
+  );
+  const modelLabel = resolveModelLabel(
+    locationState.modelDisplayName ?? uploadData.modelDisplayName ?? modelKey
+  );
+  const defaultMethod =
+    locationState.heatmapMethod ??
+    uploadData.heatmapMethod ??
+    DEFAULT_HEATMAP_METHOD;
+  const defaultLayer =
+    locationState.heatmapLayer ?? uploadData.heatmapLayer ?? "";
+  const [selectedMethod, setSelectedMethod] = useState(
+    defaultMethod || DEFAULT_HEATMAP_METHOD
+  );
+  const [selectedLayer, setSelectedLayer] = useState(defaultLayer || "");
+  const [availableMethods, setAvailableMethods] = useState([]);
+  const [availableLayers, setAvailableLayers] = useState([]);
+  const [isHeatmapLoading, setIsHeatmapLoading] = useState(false);
+  const [heatmapError, setHeatmapError] = useState(null);
+  const topHeatmapDisease =
+    locationState.heatmapTopDisease ?? uploadData.heatmapTopDisease ?? null;
+  const topHeatmapProbability =
+    locationState.heatmapTopProbability ??
+    uploadData.heatmapTopProbability ??
+    null;
 
   const [viewMode, setViewMode] = useState("original");
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -72,6 +117,208 @@ function GradcamPage() {
     }
   }, [file, navigate, showPopup]);
 
+  useEffect(() => {
+    if (!file) {
+      setAvailableMethods([]);
+      setAvailableLayers([]);
+      return;
+    }
+
+    let isActive = true;
+    const methodsController = new AbortController();
+    const layersController = new AbortController();
+
+    const loadConfiguration = async () => {
+      try {
+        const [methodsResult, layersResult] = await Promise.allSettled([
+          getAvailableMethods(modelKey, {
+            signal: methodsController.signal,
+          }),
+          getAvailableLayers(modelKey, {
+            signal: layersController.signal,
+          }),
+        ]);
+
+        if (!isActive) {
+          return;
+        }
+
+        if (methodsResult.status === "fulfilled") {
+          const methodsPayload = methodsResult.value?.methods;
+          const methods = Array.isArray(methodsPayload) ? methodsPayload : [];
+          setAvailableMethods(methods);
+          setSelectedMethod((current) => {
+            const normalized = current || DEFAULT_HEATMAP_METHOD;
+            if (methods.length === 0) {
+              return normalized;
+            }
+            if (methods.includes(normalized)) {
+              return normalized;
+            }
+            return methods[0];
+          });
+        } else if (methodsResult.status === "rejected") {
+          console.error("Failed to load heatmap methods", methodsResult.reason);
+        }
+
+        if (layersResult.status === "fulfilled") {
+          const layersPayload = layersResult.value?.layers;
+          const layers = Array.isArray(layersPayload) ? layersPayload : [];
+          setAvailableLayers(layers);
+          setSelectedLayer((current) => {
+            const normalized = current || "";
+            if (!normalized) {
+              return "";
+            }
+            if (layers.includes(normalized)) {
+              return normalized;
+            }
+            return "";
+          });
+        } else if (layersResult.status === "rejected") {
+          console.error("Failed to load heatmap layers", layersResult.reason);
+        }
+      } catch (error) {
+        if (error?.name === "AbortError") {
+          return;
+        }
+        console.error("Failed to load heatmap configuration", error);
+      }
+    };
+
+    loadConfiguration();
+
+    return () => {
+      isActive = false;
+      methodsController.abort();
+      layersController.abort();
+    };
+  }, [file, modelKey]);
+
+  useEffect(() => {
+    if (!file) {
+      return undefined;
+    }
+
+    const cachedImage = uploadData.heatmapImage;
+    const cachedMethod = uploadData.heatmapMethod;
+    const cachedLayer = uploadData.heatmapLayer ?? "";
+    const normalizedLayer = selectedLayer || "";
+
+    if (
+      cachedImage &&
+      cachedMethod &&
+      cachedMethod.toLowerCase() ===
+        (selectedMethod || DEFAULT_HEATMAP_METHOD).toLowerCase() &&
+      cachedLayer === normalizedLayer &&
+      uploadData.modelKey === modelKey
+    ) {
+      setHeatmapImage(cachedImage);
+      setHeatmapError(null);
+      setIsHeatmapLoading(false);
+      return undefined;
+    }
+
+    let isActive = true;
+    const controller = new AbortController();
+
+    setIsHeatmapLoading(true);
+    setHeatmapError(null);
+
+    generateHeatmap(file, {
+      model: modelKey,
+      method: selectedMethod || DEFAULT_HEATMAP_METHOD,
+      layer: normalizedLayer || undefined,
+      signal: controller.signal,
+    })
+      .then((data) => {
+        if (!isActive) {
+          return;
+        }
+
+        if (data?.success === false) {
+          throw new Error(data?.message ?? "Heatmap request failed.");
+        }
+
+        const rawImage = data?.heatmap_image ?? data?.heatmapImage ?? null;
+        const resolvedImage = rawImage
+          ? rawImage.startsWith("data:image")
+            ? rawImage
+            : `data:image/png;base64,${rawImage}`
+          : null;
+        const resolvedMethod =
+          data?.method_used ?? selectedMethod ?? DEFAULT_HEATMAP_METHOD;
+        const resolvedLayer = data?.layer_used ?? normalizedLayer ?? "";
+        const responseModelKey = resolveModelKey(data?.model_used ?? modelKey);
+        const responseModelLabel = resolveModelLabel(
+          data?.model_used ?? responseModelKey
+        );
+
+        const nextImage =
+          resolvedImage ?? cachedImage ?? initialHeatmapImage ?? originalImage;
+        setHeatmapImage(nextImage);
+        if (resolvedImage) {
+          setViewMode("heatmap");
+        }
+        setSelectedMethod(resolvedMethod);
+        setSelectedLayer(resolvedLayer || "");
+        updateUploadData({
+          heatmapImage:
+            resolvedImage ?? cachedImage ?? uploadData.heatmapImage ?? null,
+          heatmapMethod: resolvedMethod,
+          heatmapLayer: resolvedLayer || "",
+          heatmapTopDisease: data?.top_disease ?? topHeatmapDisease ?? null,
+          heatmapTopProbability:
+            data?.top_probability ?? topHeatmapProbability ?? null,
+          modelKey: responseModelKey,
+          modelDisplayName: responseModelLabel,
+          predictions: data?.predictions ?? predictions ?? null,
+          positiveFindings: Array.isArray(data?.positive_findings)
+            ? data.positive_findings
+            : uploadData.positiveFindings,
+        });
+        setHeatmapError(null);
+      })
+      .catch((error) => {
+        if (!isActive || error?.name === "AbortError") {
+          return;
+        }
+        console.error("Heatmap generation failed", error);
+        setHeatmapError(error.message ?? "Unable to generate heatmap.");
+        showPopup({
+          title: "Heatmap generation failed",
+          message: error.message ?? "Unable to generate heatmap.",
+          variant: "danger",
+        });
+      })
+      .finally(() => {
+        if (isActive) {
+          setIsHeatmapLoading(false);
+        }
+      });
+
+    return () => {
+      isActive = false;
+      controller.abort();
+    };
+  }, [
+    file,
+    initialHeatmapImage,
+    modelKey,
+    predictions,
+    selectedLayer,
+    selectedMethod,
+    showPopup,
+    topHeatmapDisease,
+    topHeatmapProbability,
+    updateUploadData,
+    uploadData.heatmapImage,
+    uploadData.heatmapLayer,
+    uploadData.heatmapMethod,
+    uploadData.modelKey,
+    uploadData.positiveFindings,
+  ]);
+
   if (!file) {
     return null;
   }
@@ -80,6 +327,44 @@ function GradcamPage() {
     () => Math.round(Math.min(Math.max(confidence ?? 0, 0), 1) * 100),
     [confidence]
   );
+  const topHeatmapPercent = useMemo(() => {
+    if (typeof topHeatmapProbability === "number") {
+      return Math.round(Math.min(Math.max(topHeatmapProbability, 0), 1) * 100);
+    }
+    return null;
+  }, [topHeatmapProbability]);
+  const methodOptionsToRender = useMemo(() => {
+    if (availableMethods.length > 0) {
+      return availableMethods;
+    }
+    const fallback = selectedMethod || DEFAULT_HEATMAP_METHOD;
+    return fallback ? [fallback] : [DEFAULT_HEATMAP_METHOD];
+  }, [availableMethods, selectedMethod]);
+  const layerOptionsToRender = useMemo(() => {
+    if (availableLayers.length > 0) {
+      return availableLayers;
+    }
+    return selectedLayer ? [selectedLayer] : [];
+  }, [availableLayers, selectedLayer]);
+  const topPredictionChart = useMemo(() => {
+    if (!predictions || typeof predictions !== "object") {
+      return [];
+    }
+
+    return Object.entries(predictions)
+      .filter((entry) => typeof entry[1] === "number")
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6)
+      .map(([label, probability], index) => {
+        const clamped = Math.min(Math.max(probability ?? 0, 0), 1);
+        return {
+          label,
+          probability: clamped,
+          percent: Math.round(clamped * 100),
+          highlight: index === 0,
+        };
+      });
+  }, [predictions]);
 
   const effectiveHeatmap = heatmapImage ?? originalImage;
   const isSyntheticHeatmap = !heatmapImage || heatmapImage === originalImage;
@@ -102,6 +387,14 @@ function GradcamPage() {
           confidence,
           fileName,
           file,
+          predictions,
+          positiveFindings,
+          modelKey,
+          modelDisplayName: modelLabel,
+          heatmapMethod: selectedMethod || DEFAULT_HEATMAP_METHOD,
+          heatmapLayer: selectedLayer || "",
+          heatmapTopDisease: topHeatmapDisease,
+          heatmapTopProbability: topHeatmapProbability,
         },
       })
     );
@@ -242,6 +535,82 @@ function GradcamPage() {
                 </LayoutGroup>
               </div>
 
+              <div className="grid gap-4 pt-2 sm:grid-cols-2">
+                <label className="flex flex-col gap-2 text-left text-[0.7rem] font-semibold uppercase tracking-[0.28em] text-white/50">
+                  <span className="text-[0.7rem] tracking-[0.28em] text-white/60">
+                    Method
+                  </span>
+                  <div className="relative">
+                    <select
+                      value={selectedMethod}
+                      onChange={(event) => {
+                        setSelectedMethod(event.target.value);
+                        setHeatmapError(null);
+                      }}
+                      disabled={isHeatmapLoading}
+                      className="w-full appearance-none rounded-2xl border border-white/10 bg-black/50 px-4 py-3 text-sm font-semibold text-white/85 outline-none transition hover:border-cyan-300/40 focus:border-cyan-300 focus:ring-2 focus:ring-cyan-500/40 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {methodOptionsToRender.map((method) => (
+                        <option key={method} value={method}>
+                          {method}
+                        </option>
+                      ))}
+                    </select>
+                    <svg
+                      className="pointer-events-none absolute right-4 top-1/2 h-3 w-3 -translate-y-1/2 text-white/40"
+                      viewBox="0 0 12 12"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M3 5l3 3 3-3"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </div>
+                </label>
+                <label className="flex flex-col gap-2 text-left text-[0.7rem] font-semibold uppercase tracking-[0.28em] text-white/50">
+                  <span className="text-[0.7rem] tracking-[0.28em] text-white/60">
+                    Layer
+                  </span>
+                  <div className="relative">
+                    <select
+                      value={selectedLayer}
+                      onChange={(event) => {
+                        setSelectedLayer(event.target.value);
+                        setHeatmapError(null);
+                      }}
+                      disabled={isHeatmapLoading}
+                      className="w-full appearance-none rounded-2xl border border-white/10 bg-black/50 px-4 py-3 text-sm font-semibold text-white/85 outline-none transition hover:border-cyan-300/40 focus:border-cyan-300 focus:ring-2 focus:ring-cyan-500/40 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <option value="">Auto (recommended)</option>
+                      {layerOptionsToRender.map((layer) => (
+                        <option key={layer} value={layer}>
+                          {layer}
+                        </option>
+                      ))}
+                    </select>
+                    <svg
+                      className="pointer-events-none absolute right-4 top-1/2 h-3 w-3 -translate-y-1/2 text-white/40"
+                      viewBox="0 0 12 12"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M3 5l3 3 3-3"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </div>
+                </label>
+              </div>
+
               <div className="relative overflow-hidden rounded-[28px] border border-white/5 bg-black/60 shadow-[0_50px_110px_-60px_rgba(37,99,235,0.6)]">
                 <AnimatePresence mode="wait">
                   {viewMode === "original" ? (
@@ -269,6 +638,11 @@ function GradcamPage() {
                         alt="Grad-CAM heatmap"
                         className="h-full w-full object-cover"
                       />
+                      {isHeatmapLoading ? (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/55 backdrop-blur-sm">
+                          <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/30 border-t-cyan-300" />
+                        </div>
+                      ) : null}
                       {isSyntheticHeatmap ? (
                         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(252,70,107,0.55),rgba(56,189,248,0.2),transparent_78%)] mix-blend-screen" />
                       ) : null}
@@ -276,6 +650,56 @@ function GradcamPage() {
                     </motion.div>
                   )}
                 </AnimatePresence>
+              </div>
+
+              {heatmapError ? (
+                <p className="text-sm font-medium text-rose-300">
+                  {heatmapError}
+                </p>
+              ) : null}
+
+              <div className="grid gap-4 rounded-3xl border border-white/10 bg-white/5 p-5 text-xs text-white/60 sm:grid-cols-2 sm:text-sm">
+                <div className="space-y-1">
+                  <p className="text-[0.65rem] uppercase tracking-[0.28em] text-white/50">
+                    Model
+                  </p>
+                  <p className="text-sm font-semibold text-white/85">
+                    {modelLabel}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[0.65rem] uppercase tracking-[0.28em] text-white/50">
+                    Method
+                  </p>
+                  <p className="text-sm font-semibold text-white/85">
+                    {selectedMethod || DEFAULT_HEATMAP_METHOD}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[0.65rem] uppercase tracking-[0.28em] text-white/50">
+                    Layer
+                  </p>
+                  <p className="text-sm font-semibold text-white/85">
+                    {selectedLayer ? selectedLayer : "Auto"}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[0.65rem] uppercase tracking-[0.28em] text-white/50">
+                    Peak Focus
+                  </p>
+                  <p className="text-sm font-semibold text-white/85">
+                    {topHeatmapDisease ? (
+                      <span>
+                        {topHeatmapDisease}
+                        {topHeatmapPercent != null
+                          ? ` · ${topHeatmapPercent}%`
+                          : ""}
+                      </span>
+                    ) : (
+                      <span>Pending</span>
+                    )}
+                  </p>
+                </div>
               </div>
             </div>
 
@@ -289,16 +713,46 @@ function GradcamPage() {
                 <h2 className="text-xl font-semibold text-white/90 sm:text-2xl">
                   Model Prediction Graph
                 </h2>
-                <span className="rounded-full border border-white/10 bg-white/10 px-4 py-1 text-xs text-white/60">
-                  Coming soon
+                <span className="rounded-full border border-white/10 bg-white/10 px-4 py-1 text-xs text-white/70">
+                  {modelLabel}
                 </span>
               </div>
-              <div className="flex h-full min-h-72 items-center justify-center rounded-[28px] border border-dashed border-cyan-500/40 bg-black/40 text-center text-sm text-white/50">
-                Visual probability distribution chart will render here.
+              <div className="rounded-[28px] border border-white/10 bg-black/40 p-6">
+                {topPredictionChart.length ? (
+                  <div className="space-y-4">
+                    {topPredictionChart.map((item) => (
+                      <div key={item.label} className="flex items-center gap-3">
+                        <span className="w-32 shrink-0 text-xs font-semibold uppercase tracking-[0.28em] text-white/55 sm:text-[0.7rem]">
+                          {item.label.replace(/_/g, " ")}
+                        </span>
+                        <div className="relative flex-1 overflow-hidden rounded-full bg-white/10">
+                          <div
+                            className={`absolute inset-y-0 left-0 rounded-full ${
+                              item.highlight
+                                ? "bg-linear-to-r from-cyan-400 via-sky-500 to-blue-600"
+                                : "bg-white/45"
+                            }`}
+                            style={{ width: `${Math.max(item.percent, 4)}%` }}
+                          />
+                        </div>
+                        <span className="w-12 text-right text-xs font-semibold text-white/75">
+                          {item.percent}%
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex h-full min-h-40 items-center justify-center text-sm text-white/60">
+                    Predictions will appear after running inference.
+                  </div>
+                )}
               </div>
               <div className="rounded-3xl border border-white/10 bg-white/5 p-5 text-xs text-white/60 sm:text-sm">
                 Current top prediction: {disease.name} · Confidence{" "}
                 {confidencePercent}%
+                {topHeatmapPercent != null
+                  ? ` · Focus ${topHeatmapPercent}%`
+                  : ""}
               </div>
             </motion.div>
           </motion.section>

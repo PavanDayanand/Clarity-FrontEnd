@@ -18,23 +18,34 @@ import { usePopup } from "../components/ui/PopupProvider.jsx";
 import { predictDisease } from "../api/clarityApi.js";
 import { findDiseaseByName, getTopFindings } from "../utils/diseaseLookup.js";
 import { useUpload } from "../context/UploadContext.jsx";
+import {
+  DEFAULT_MODEL_KEY,
+  MODEL_LIST,
+  MODEL_KEYS,
+  resolveModelKey,
+  resolveModelLabel,
+} from "../utils/modelUtils.js";
 
-const modelOptions = [
-  {
-    id: "atlas",
-    label: "Atlas Vision",
-    summary: "Dense convolutional backbone tuned on NIH ChestX-ray14.",
-    badges: ["vision", "baseline"],
-    footnote: "Best for rapid thoracic triage.",
+const modelOptions = MODEL_LIST;
+
+const MODEL_STYLES = {
+  densenet121: {
+    dotClass: "bg-cyan-300",
+    borderClass: "border-cyan-200/25",
+    backgroundClass: "bg-cyan-200/5",
+    gradientClass:
+      "bg-linear-to-r from-cyan-200/80 via-cyan-300/80 to-blue-500/85 shadow-[0_22px_70px_-40px_rgba(59,130,246,0.9)]",
+    tagTone: "text-cyan-200",
   },
-  {
-    id: "hybrid",
-    label: "Spectra Fusion",
-    summary: "Hybrid multi-modal ensemble with CLIP embeddings.",
-    badges: ["fusion", "ensemble"],
-    footnote: "Balances precision with richer context.",
+  resnet152: {
+    dotClass: "bg-indigo-300",
+    borderClass: "border-indigo-200/25",
+    backgroundClass: "bg-indigo-200/5",
+    gradientClass:
+      "bg-linear-to-r from-indigo-200/80 via-sky-400/80 to-purple-500/85 shadow-[0_22px_70px_-45px_rgba(129,140,248,0.9)]",
+    tagTone: "text-indigo-200",
   },
-];
+};
 
 const progressDurationMs = 2300;
 const progressSegments = 28;
@@ -45,6 +56,7 @@ function PredictPage() {
   const navigate = useNavigate();
   const location = useLocation();
   useScrollToTop();
+  const { showPopup } = usePopup();
   const { uploadData, updateUploadData } = useUpload();
   const locationState = location.state ?? {};
   const file = locationState.file ?? uploadData.file ?? null;
@@ -65,6 +77,14 @@ function PredictPage() {
     locationState.predictions ?? uploadData.predictions ?? null;
   const initialPositiveFindings =
     locationState.positiveFindings ?? uploadData.positiveFindings ?? [];
+  const requestModelKey = resolveModelKey(
+    locationState.modelKey ?? uploadData.modelKey ?? DEFAULT_MODEL_KEY
+  );
+  const fallbackModelLabel = resolveModelLabel(
+    uploadData.modelDisplayName ?? requestModelKey
+  );
+  const modelCount = MODEL_KEYS.length;
+  const modelCountLabel = `${modelCount} model${modelCount === 1 ? "" : "s"}`;
   const [isTransitioning, setIsTransitioning] = useState(false);
   const pendingNavigation = useRef(null);
   const [predictionData, setPredictionData] = useState(null);
@@ -75,14 +95,86 @@ function PredictPage() {
   const [apiError, setApiError] = useState(null);
   const [isLoading, setIsLoading] = useState(Boolean(file));
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-  const [activeModelId, setActiveModelId] = useState(null);
+  const [activeModelId, setActiveModelId] = useState(() => requestModelKey);
   const [isSimulating, setIsSimulating] = useState(false);
   const [currentTarget, setCurrentTarget] = useState(null);
   const [progressPercent, setProgressPercent] = useState(0);
   const [modelConfidenceMap, setModelConfidenceMap] = useState({});
   const [chartView, setChartView] = useState("both");
-  const { showPopup } = usePopup();
+  const [modelStates, setModelStates] = useState({});
+  const pendingRequestsRef = useRef({});
+  const seededDefaultResultRef = useRef(false);
 
+  const loadModelPrediction = useCallback(
+    (inputModelKey) => {
+      if (!file) {
+        return;
+      }
+
+      const modelKey = resolveModelKey(inputModelKey ?? DEFAULT_MODEL_KEY);
+
+      if (pendingRequestsRef.current[modelKey]) {
+        return;
+      }
+
+      const controller = new AbortController();
+      pendingRequestsRef.current[modelKey] = controller;
+
+      setModelStates((previous) => {
+        const existing = previous[modelKey];
+        return {
+          ...previous,
+          [modelKey]: {
+            status: "loading",
+            data: existing?.data ?? null,
+            error: null,
+          },
+        };
+      });
+
+      predictDisease(file, { model: modelKey, signal: controller.signal })
+        .then((response) => {
+          setModelStates((previous) => ({
+            ...previous,
+            [modelKey]: {
+              status: "success",
+              data: response ?? null,
+              error: null,
+            },
+          }));
+        })
+        .catch((error) => {
+          if (error?.name === "AbortError") {
+            return;
+          }
+
+          console.error(`Prediction request failed for ${modelKey}`, error);
+
+          setModelStates((previous) => ({
+            ...previous,
+            [modelKey]: {
+              status: "error",
+              data: previous[modelKey]?.data ?? null,
+              error: error?.message ?? "Unable to generate predictions.",
+            },
+          }));
+
+          if (modelKey === activeModelId) {
+            showPopup({
+              title: "Prediction failed",
+              message:
+                error?.message ??
+                "We couldn't generate predictions for this model.",
+              variant: "danger",
+            });
+          }
+        })
+        .finally(() => {
+          delete pendingRequestsRef.current[modelKey];
+        });
+    },
+    [activeModelId, file, predictDisease, showPopup]
+  );
   useEffect(() => {
     if (!file) {
       setIsLoading(false);
@@ -92,98 +184,161 @@ function PredictPage() {
         variant: "warning",
       });
       navigate("/", { replace: true });
+    }
+  }, [file, navigate, showPopup]);
+
+  useEffect(() => {
+    if (!file) {
       return;
     }
 
-    if (initialPredictions) {
-      setIsLoading(false);
-      setApiError(null);
-      setPredictionData(
-        (current) =>
-          current ?? {
+    if (
+      initialPredictions &&
+      !seededDefaultResultRef.current &&
+      !modelStates[requestModelKey]
+    ) {
+      seededDefaultResultRef.current = true;
+      setModelStates((previous) => ({
+        ...previous,
+        [requestModelKey]: {
+          status: "success",
+          data: {
+            success: true,
             predictions: initialPredictions,
+            positive_findings: initialPositiveFindings ?? [],
             confidence: initialConfidence,
-          }
-      );
-      setPredictionsMap(initialPredictions);
-      setPositiveFindings(initialPositiveFindings ?? []);
+            model_used: resolveModelLabel(requestModelKey),
+          },
+          error: null,
+        },
+      }));
+    }
+  }, [
+    file,
+    initialConfidence,
+    initialPositiveFindings,
+    initialPredictions,
+    modelStates,
+    requestModelKey,
+  ]);
+
+  useEffect(() => {
+    if (!file) {
       return;
     }
 
-    let isCancelled = false;
-    setIsLoading(true);
-    setApiError(null);
-    setPredictionData(null);
-    setPredictionsMap(null);
-    setPositiveFindings([]);
+    const state = modelStates[requestModelKey];
+    if (!state && !pendingRequestsRef.current[requestModelKey]) {
+      loadModelPrediction(requestModelKey);
+    }
+  }, [file, loadModelPrediction, modelStates, requestModelKey]);
 
-    predictDisease(file)
-      .then((data) => {
-        if (isCancelled) {
-          return;
-        }
+  useEffect(() => {
+    if (!file) {
+      return;
+    }
 
-        if (data?.success === false) {
-          throw new Error(data?.message ?? "Prediction request failed.");
-        }
+    MODEL_KEYS.forEach((modelKey) => {
+      if (!modelStates[modelKey] && !pendingRequestsRef.current[modelKey]) {
+        loadModelPrediction(modelKey);
+      }
+    });
+  }, [file, loadModelPrediction, modelStates]);
 
-        const predictions = data?.predictions ?? null;
-        const positive = Array.isArray(data?.positive_findings)
-          ? data.positive_findings
-          : [];
-        const summary = getTopFindings(positive, predictions);
-        const leadingFinding = summary[0]?.disease ?? null;
-        const derivedConfidence =
-          typeof data?.confidence === "number"
-            ? data.confidence
-            : typeof summary[0]?.probability === "number"
-            ? summary[0].probability
-            : initialConfidence;
+  useEffect(() => {
+    if (!file) {
+      return;
+    }
 
-        setPredictionData(data);
-        setPredictionsMap(predictions);
-        setPositiveFindings(positive);
-        updateUploadData({
-          file,
-          fileName,
-          originalImage,
-          previewUrl: uploadData.previewUrl ?? originalImage,
-          predictions,
-          positiveFindings: positive,
-          predictionSummary: summary,
-          topFinding: leadingFinding,
-          confidence: derivedConfidence,
-          disease: leadingFinding
-            ? findDiseaseByName(leadingFinding) ?? initialDisease
-            : initialDisease,
-          heatmapImage:
-            data?.heatmap_image ??
-            data?.heatmap ??
-            uploadData.heatmapImage ??
-            null,
-        });
-      })
-      .catch((error) => {
-        if (isCancelled) {
-          return;
-        }
-        console.error("Prediction request failed", error);
-        setPredictionData(null);
-        setPredictionsMap(null);
-        setPositiveFindings([]);
-        setApiError(error.message ?? "Unable to generate predictions.");
-      })
-      .finally(() => {
-        if (!isCancelled) {
-          setIsLoading(false);
-        }
-      });
+    const activeState = modelStates[activeModelId];
+    if (!activeState) {
+      setIsLoading(true);
+      setApiError(null);
+      return;
+    }
 
-    return () => {
-      isCancelled = true;
-    };
-  }, [file, navigate, showPopup, updateUploadData]);
+    setIsLoading(activeState.status === "loading");
+    setApiError(activeState.status === "error" ? activeState.error : null);
+  }, [activeModelId, file, modelStates]);
 
+  useEffect(() => {
+    if (!file) {
+      return;
+    }
+
+    const activeState = modelStates[activeModelId];
+    if (!activeState || activeState.status !== "success") {
+      return;
+    }
+
+    const data = activeState.data ?? null;
+    if (!data) {
+      return;
+    }
+
+    const predictions = data?.predictions ?? null;
+    const positive = Array.isArray(data?.positive_findings)
+      ? data.positive_findings
+      : [];
+    const summary = getTopFindings(positive, predictions);
+    const leadingFinding = summary[0]?.disease ?? null;
+    const derivedConfidenceRaw =
+      typeof data?.confidence === "number"
+        ? data.confidence
+        : typeof summary[0]?.probability === "number"
+        ? summary[0].probability
+        : initialConfidence;
+    const derivedConfidence = Number.isFinite(derivedConfidenceRaw)
+      ? derivedConfidenceRaw
+      : initialConfidence;
+    const confidencePercentTarget = Math.round(
+      Math.min(Math.max(derivedConfidence ?? 0, 0), 1) * 100
+    );
+
+    setPredictionData(data);
+    setPredictionsMap(predictions);
+    setPositiveFindings(positive);
+
+    setModelConfidenceMap((previous) => ({
+      ...previous,
+      [activeModelId]: confidencePercentTarget,
+    }));
+    setCurrentTarget(confidencePercentTarget);
+    setProgressPercent(0);
+    setIsSimulating(true);
+
+    updateUploadData({
+      file,
+      fileName,
+      originalImage,
+      previewUrl: uploadData.previewUrl ?? originalImage,
+      predictions,
+      positiveFindings: positive,
+      predictionSummary: summary,
+      topFinding: leadingFinding,
+      confidence: derivedConfidence,
+      disease: leadingFinding
+        ? findDiseaseByName(leadingFinding) ?? initialDisease
+        : initialDisease,
+      heatmapImage: null,
+      heatmapMethod: null,
+      heatmapLayer: null,
+      heatmapTopDisease: null,
+      heatmapTopProbability: null,
+      modelKey: activeModelId,
+      modelDisplayName: resolveModelLabel(activeModelId),
+    });
+  }, [
+    activeModelId,
+    file,
+    fileName,
+    initialConfidence,
+    initialDisease,
+    modelStates,
+    originalImage,
+    updateUploadData,
+    uploadData.previewUrl,
+  ]);
   if (!file) {
     return null;
   }
@@ -262,39 +417,66 @@ function PredictPage() {
     return defaultDisease;
   }, [initialDisease, topFinding]);
 
-  const secondaryConfidencePercent = useMemo(() => {
-    if (sortedFindings.length > 1) {
-      const second = sortedFindings[1]?.probability;
-      if (typeof second === "number") {
-        return Math.round(Math.min(Math.max(second, 0), 1) * 100);
-      }
-    }
-
-    if (predictionsMap && typeof predictionsMap === "object") {
-      const sortedValues = Object.values(predictionsMap)
-        .filter((value) => typeof value === "number")
-        .sort((a, b) => b - a);
-      if (sortedValues.length > 1) {
-        return Math.round(Math.min(Math.max(sortedValues[1], 0), 1) * 100);
-      }
-    }
-
-    return Math.max(48, Math.round(confidencePercent * 0.88));
-  }, [sortedFindings, predictionsMap, confidencePercent]);
-
   const confidenceTargets = useMemo(() => {
-    const atlasTarget = Math.max(0, Math.min(100, confidencePercent));
-    const rawHybrid = Math.max(34, Math.min(100, secondaryConfidencePercent));
-    const hybridTarget =
-      rawHybrid === atlasTarget
-        ? Math.max(0, Math.min(99, rawHybrid - 6))
-        : rawHybrid;
+    const mapping = {};
 
-    return {
-      atlas: atlasTarget,
-      hybrid: hybridTarget,
-    };
-  }, [confidencePercent, secondaryConfidencePercent]);
+    MODEL_KEYS.forEach((modelKey) => {
+      const state = modelStates[modelKey];
+      if (!state || state.status !== "success") {
+        return;
+      }
+
+      const data = state.data ?? null;
+      if (!data) {
+        return;
+      }
+
+      const positive = Array.isArray(data?.positive_findings)
+        ? data.positive_findings
+        : [];
+      const summary = getTopFindings(positive, data?.predictions);
+      const primaryConfidence =
+        typeof data?.confidence === "number"
+          ? data.confidence
+          : typeof summary[0]?.probability === "number"
+          ? summary[0].probability
+          : null;
+
+      if (typeof primaryConfidence === "number") {
+        mapping[modelKey] = Math.round(
+          Math.min(Math.max(primaryConfidence, 0), 1) * 100
+        );
+      }
+    });
+
+    return mapping;
+  }, [modelStates]);
+
+  const modelHighlights = useMemo(() => {
+    const highlights = {};
+
+    MODEL_KEYS.forEach((modelKey) => {
+      const state = modelStates[modelKey];
+      if (!state || state.status !== "success") {
+        return;
+      }
+
+      const data = state.data ?? null;
+      if (!data) {
+        return;
+      }
+
+      const positive = Array.isArray(data?.positive_findings)
+        ? data.positive_findings
+        : [];
+      const summary = getTopFindings(positive, data?.predictions);
+      if (summary.length > 0) {
+        highlights[modelKey] = summary[0];
+      }
+    });
+
+    return highlights;
+  }, [modelStates]);
 
   const activeModel = useMemo(
     () => modelOptions.find((option) => option.id === activeModelId) ?? null,
@@ -318,7 +500,11 @@ function PredictPage() {
 
   const displayPercent = Math.round(currentProgressValue);
 
-  const baselineConfidence = confidenceTargets.atlas ?? 0;
+  const baselineKey = MODEL_KEYS[0];
+  const baselineConfidence = confidenceTargets[baselineKey] ?? 0;
+  const baselineLabel =
+    MODEL_LIST.find((model) => model.id === baselineKey)?.label ??
+    resolveModelLabel(baselineKey);
   const deltaAgainstBaseline = activeModelId
     ? Math.round(
         (modelConfidenceMap[activeModelId] ?? currentProgressValue) -
@@ -341,65 +527,106 @@ function PredictPage() {
       : "text-white/60";
 
   const comparisonDataset = useMemo(() => {
-    const baseEntries = sortedFindings.length
-      ? sortedFindings.slice(0, 5)
-      : Object.entries(predictionsMap ?? {})
-          .filter((entry) => typeof entry[1] === "number")
-          .sort((a, b) => b[1] - a[1])
-          .slice(0, 5)
-          .map(([finding, probability]) => ({
-            disease: finding,
-            probability,
-          }));
+    const modelPredictionMaps = {};
 
-    if (!baseEntries.length) {
-      baseEntries.push({
-        disease: disease?.name ?? "Unknown finding",
-        probability: confidenceScore ?? 0.62,
-      });
+    MODEL_KEYS.forEach((modelKey) => {
+      const state = modelStates[modelKey];
+      if (state?.status === "success" && state.data?.predictions) {
+        modelPredictionMaps[modelKey] = state.data.predictions;
+      }
+    });
+
+    const seedKey = modelPredictionMaps[activeModelId]
+      ? activeModelId
+      : MODEL_KEYS.find((key) => modelPredictionMaps[key]) ?? null;
+
+    if (!seedKey) {
+      return [];
     }
 
-    return baseEntries.map((entry, index) => {
-      const baseProbability = Math.round(
-        Math.min(Math.max(entry.probability ?? 0, 0), 1) * 100
-      );
+    const diseaseSet = new Set();
 
-      const hybridBase = Math.min(
-        100,
-        Math.max(
-          0,
-          index === 0
-            ? Math.round(baseProbability * 0.93 + 6)
-            : Math.round(baseProbability * (0.8 + index * 0.05))
-        )
-      );
+    const addTopDiseases = (predictionMap, limit) => {
+      Object.entries(predictionMap ?? {})
+        .filter(([, probability]) => typeof probability === "number")
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, limit)
+        .forEach(([diseaseName]) => {
+          diseaseSet.add(diseaseName);
+        });
+    };
 
-      return {
-        label: entry.disease ?? `Finding ${index + 1}`,
-        atlas: baseProbability,
-        hybrid: hybridBase,
-      };
+    addTopDiseases(modelPredictionMaps[seedKey], 6);
+    MODEL_KEYS.forEach((modelKey) => {
+      if (modelKey === seedKey) {
+        return;
+      }
+      const map = modelPredictionMaps[modelKey];
+      if (map) {
+        addTopDiseases(map, 3);
+      }
     });
-  }, [sortedFindings, predictionsMap, disease?.name, confidenceScore]);
 
-  const chartButtons = [
-    { id: "both", label: "Both" },
-    { id: "atlas", label: "Atlas" },
-    { id: "hybrid", label: "Spectra" },
-  ];
+    const rankingSource = modelPredictionMaps[seedKey] ?? {};
+    const diseaseList = Array.from(diseaseSet).sort(
+      (a, b) => (rankingSource[b] ?? 0) - (rankingSource[a] ?? 0)
+    );
+
+    return diseaseList.slice(0, 6).map((diseaseName) => {
+      const entry = { label: diseaseName };
+
+      MODEL_KEYS.forEach((modelKey) => {
+        const rawScore = modelPredictionMaps[modelKey]?.[diseaseName];
+        entry[modelKey] = Math.round(
+          Math.min(Math.max(rawScore ?? 0, 0), 1) * 100
+        );
+      });
+
+      return entry;
+    });
+  }, [activeModelId, modelStates]);
+
+  const visibleChartModels = useMemo(() => {
+    if (chartView === "both") {
+      return MODEL_LIST;
+    }
+    const matched = MODEL_LIST.filter((model) => model.id === chartView);
+    if (matched.length > 0) {
+      return matched;
+    }
+    return MODEL_LIST;
+  }, [chartView]);
+
+  const chartButtons = useMemo(
+    () => [
+      { id: "both", label: "Both" },
+      ...MODEL_LIST.map((model) => ({
+        id: model.id,
+        label: model.label,
+      })),
+    ],
+    []
+  );
 
   useEffect(() => {
     setModelConfidenceMap((previous) => {
       if (!previous || typeof previous !== "object") {
-        return previous;
+        return { ...confidenceTargets };
       }
 
       let hasChanges = false;
       const next = { ...previous };
 
       Object.entries(confidenceTargets).forEach(([key, value]) => {
-        if (next[key] != null && value != null && next[key] !== value) {
+        if (value != null && next[key] !== value) {
           next[key] = value;
+          hasChanges = true;
+        }
+      });
+
+      Object.keys(next).forEach((key) => {
+        if (!(key in confidenceTargets)) {
+          delete next[key];
           hasChanges = true;
         }
       });
@@ -431,6 +658,14 @@ function PredictPage() {
   };
 
   const handleNavigation = (path) => {
+    const navigationModelKey = resolveModelKey(
+      uploadData.modelKey ?? predictionData?.model_used ?? requestModelKey
+    );
+    const navigationModelLabel =
+      uploadData.modelDisplayName ??
+      resolveModelLabel(
+        predictionData?.model_used ?? navigationModelKey ?? fallbackModelLabel
+      );
     triggerNavigation(() =>
       navigate(path, {
         state: {
@@ -444,6 +679,12 @@ function PredictPage() {
           positiveFindings,
           predictionSummary: sortedFindings,
           topFinding: topFinding?.disease ?? disease?.name,
+          modelKey: navigationModelKey,
+          modelDisplayName: navigationModelLabel,
+          heatmapMethod: uploadData.heatmapMethod ?? null,
+          heatmapLayer: uploadData.heatmapLayer ?? null,
+          heatmapTopDisease: uploadData.heatmapTopDisease ?? null,
+          heatmapTopProbability: uploadData.heatmapTopProbability ?? null,
         },
       })
     );
@@ -455,37 +696,28 @@ function PredictPage() {
 
   const handleModelSelect = useCallback(
     (modelId) => {
-      if (isSimulating && activeModelId === modelId) {
+      if (activeModelId === modelId) {
+        const cachedPercent = modelConfidenceMap[modelId] ?? 0;
+        setCurrentTarget(cachedPercent);
+        setProgressPercent(0);
+        setIsSimulating(true);
         return;
       }
-
-      const targetRaw =
-        confidenceTargets[modelId] ?? confidenceTargets.atlas ?? 0;
-      const target = Number.isFinite(targetRaw) ? Math.max(0, targetRaw) : 0;
 
       setActiveModelId(modelId);
-      setCurrentTarget(target);
-      setProgressPercent(0);
-      setModelConfidenceMap((prev) => {
-        const next = { ...prev };
-        delete next[modelId];
-        if (target <= 0) {
-          next[modelId] = 0;
-        }
-        return next;
-      });
 
-      if (target <= 0) {
-        setIsSimulating(false);
-        return;
+      const state = modelStates[modelId];
+      if (!state || state.status !== "success") {
+        loadModelPrediction(modelId);
       }
-
-      setIsSimulating(true);
     },
-    [confidenceTargets, isSimulating, activeModelId]
+    [activeModelId, loadModelPrediction, modelConfidenceMap, modelStates]
   );
 
   const handleChartViewChange = useCallback((view) => {
+    if (view !== "both" && !MODEL_KEYS.includes(view)) {
+      return;
+    }
     setChartView(view);
   }, []);
 
@@ -700,7 +932,7 @@ function PredictPage() {
                     </p>
                   </div>
                   <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.32em] text-white/55">
-                    2 models
+                    {modelCountLabel}
                   </span>
                 </motion.div>
                 <motion.div
@@ -710,9 +942,53 @@ function PredictPage() {
                 >
                   {modelOptions.map((option, index) => {
                     const isActive = activeModelId === option.id;
-                    const hasResult = modelConfidenceMap[option.id] != null;
-                    const isDisabled = isSimulating && !isActive;
+                    const state = modelStates[option.id];
+                    const status = state?.status ?? null;
+                    const hasResult = status === "success";
+                    const isLoadingModel = status === "loading";
+                    const isDisabled =
+                      isSimulating && !isActive && isLoadingModel;
                     const buttonDelay = 0.18 + index * 0.05;
+                    const style = MODEL_STYLES[option.id] ?? {
+                      dotClass: "bg-cyan-300",
+                      borderClass: "border-white/10",
+                      backgroundClass: "bg-white/5",
+                      gradientClass:
+                        "bg-linear-to-r from-cyan-200/80 via-cyan-300/80 to-blue-500/85",
+                      tagTone: "text-cyan-200",
+                    };
+                    const highlight = modelHighlights[option.id] ?? null;
+                    const highlightLabel = highlight?.disease
+                      ? highlight.disease.replace(/_/g, " ")
+                      : null;
+                    const highlightPercent = highlight?.probability
+                      ? Math.round(
+                          Math.min(Math.max(highlight.probability ?? 0, 0), 1) *
+                            100
+                        )
+                      : null;
+                    const confidenceValue = hasResult
+                      ? Math.round(
+                          modelConfidenceMap[option.id] ??
+                            confidenceTargets[option.id] ??
+                            (typeof state?.data?.confidence === "number"
+                              ? Math.min(
+                                  Math.max(state.data.confidence, 0),
+                                  1
+                                ) * 100
+                              : 0)
+                        )
+                      : 0;
+
+                    const statusLabel = (() => {
+                      if (isLoadingModel) {
+                        return "Loading...";
+                      }
+                      if (hasResult) {
+                        return `${confidenceValue}%`;
+                      }
+                      return "Run";
+                    })();
 
                     return (
                       <motion.button
@@ -723,10 +999,10 @@ function PredictPage() {
                         whileTap={{ scale: 0.98 }}
                         {...revealProps}
                         custom={buttonDelay}
-                        className={`relative flex h-full flex-col justify-between gap-4 rounded-[28px] border border-white/10 px-6 py-7 text-left transition ${
+                        className={`relative flex h-full flex-col gap-5 rounded-[28px] border px-6 py-7 text-left transition ${
                           isActive
                             ? "border-cyan-300/60 bg-[#081632]/95 shadow-[0_50px_120px_-70px_rgba(14,165,233,0.55)]"
-                            : "bg-white/5 hover:border-cyan-200/40 hover:bg-white/10"
+                            : "border-white/10 bg-white/5 hover:border-cyan-200/40 hover:bg-white/10"
                         } ${isDisabled ? "cursor-not-allowed opacity-60" : ""}`}
                       >
                         <div className="flex flex-wrap items-center gap-2.5 text-[0.65rem] uppercase tracking-[0.32em] text-white/55">
@@ -747,21 +1023,57 @@ function PredictPage() {
                           <h3 className="text-xl font-semibold text-white/90">
                             {option.label}
                           </h3>
-                          <p className="mt-2 text-sm text-white/60">
+                          {option.tagline ? (
+                            <p className="mt-1 text-xs font-semibold uppercase tracking-[0.28em] text-white/45">
+                              {option.tagline}
+                            </p>
+                          ) : null}
+                          <p className="mt-3 text-sm text-white/60">
                             {option.summary}
                           </p>
                         </div>
                         <div className="flex items-center justify-between text-xs text-white/55">
-                          <span>{option.footnote}</span>
+                          <span className={style.tagTone ?? "text-white/60"}>
+                            {option.footnote}
+                          </span>
                           <span
                             className={`text-sm font-semibold ${
-                              hasResult ? "text-cyan-200" : "text-white/35"
+                              hasResult
+                                ? style.tagTone ?? "text-cyan-200"
+                                : "text-white/45"
                             }`}
                           >
-                            {hasResult
-                              ? `${Math.round(modelConfidenceMap[option.id])}%`
-                              : "Run"}
+                            {statusLabel}
                           </span>
+                        </div>
+                        <div
+                          className={`rounded-2xl border px-4 py-3 text-xs text-white/70 ${
+                            style.borderClass ?? "border-white/10"
+                          } ${style.backgroundClass ?? "bg-white/5"}`}
+                        >
+                          <p className="text-[0.65rem] uppercase tracking-[0.28em] text-white/45">
+                            Top Class
+                          </p>
+                          {isLoadingModel ? (
+                            <p className="mt-2 text-sm text-white/60">
+                              Generating predictions...
+                            </p>
+                          ) : hasResult && highlightLabel ? (
+                            <div className="mt-2 space-y-1">
+                              <p className="text-sm font-semibold text-white/90">
+                                {highlightLabel}
+                              </p>
+                              <p className="text-xs text-white/60">
+                                {highlightPercent != null
+                                  ? `${highlightPercent}% confidence`
+                                  : "Confidence unavailable"}
+                              </p>
+                            </div>
+                          ) : (
+                            <p className="mt-2 text-xs text-white/55">
+                              Run inference to reveal the leading class.
+                            </p>
+                          )}
                         </div>
                       </motion.button>
                     );
@@ -802,7 +1114,7 @@ function PredictPage() {
                     </h3>
                   </div>
                   <span className={`text-sm font-semibold ${deltaToneClass}`}>
-                    {deltaDescriptor} &nbsp; vs atlas baseline
+                    {deltaDescriptor} &nbsp; vs {baselineLabel} baseline
                   </span>
                 </motion.div>
                 <motion.p
@@ -911,72 +1223,88 @@ function PredictPage() {
                 className="mt-8 rounded-[40px] border border-white/10 bg-[#060f23]/85 px-8 py-10 shadow-[0_70px_180px_-90px_rgba(37,99,235,0.55)]"
               >
                 <div className="flex flex-wrap items-center gap-5 text-[0.7rem] uppercase tracking-[0.32em] text-white/45">
-                  {chartView !== "hybrid" ? (
-                    <span className="inline-flex items-center gap-2">
-                      <span className="h-2.5 w-2.5 rounded-full bg-cyan-300" />
-                      Atlas Vision
-                    </span>
-                  ) : null}
-                  {chartView !== "atlas" ? (
-                    <span className="inline-flex items-center gap-2">
-                      <span className="h-2.5 w-2.5 rounded-full bg-indigo-300" />
-                      Spectra Fusion
-                    </span>
-                  ) : null}
+                  {visibleChartModels.map((model) => {
+                    const style = MODEL_STYLES[model.id] ?? {};
+                    return (
+                      <span
+                        key={model.id}
+                        className="inline-flex items-center gap-2"
+                      >
+                        <span
+                          className={`h-2.5 w-2.5 rounded-full ${
+                            style.dotClass ?? "bg-cyan-300"
+                          }`}
+                        />
+                        {model.label}
+                      </span>
+                    );
+                  })}
                 </div>
                 <div className="mt-6 flex flex-col gap-6">
-                  {comparisonDataset.map((item) => (
-                    <div key={item.label} className="space-y-3">
-                      <div className="flex items-center justify-between text-sm text-white/70">
-                        <span className="truncate text-white/80">
-                          {item.label}
-                        </span>
-                        <span className="text-white/55">
-                          {chartView === "atlas"
-                            ? `${item.atlas}%`
-                            : chartView === "hybrid"
-                            ? `${item.hybrid}%`
-                            : `${Math.max(item.atlas, item.hybrid)}% peak`}
-                        </span>
-                      </div>
-                      <div className="grid gap-2">
-                        {chartView !== "hybrid" ? (
-                          <div className="group relative h-10 overflow-hidden rounded-2xl border border-cyan-200/25 bg-cyan-200/5">
-                            <div
-                              className="absolute inset-y-1 left-1 rounded-[18px] bg-linear-to-r from-cyan-200/80 via-cyan-300/80 to-blue-500/85 shadow-[0_22px_70px_-40px_rgba(59,130,246,0.9)] transition-all duration-500"
-                              style={{
-                                width: `${Math.max(
-                                  1,
-                                  Math.min(item.atlas ?? 0, 100)
-                                )}%`,
-                              }}
-                            >
-                              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-black/35 px-3 py-1 text-[0.7rem] font-semibold text-white opacity-0 backdrop-blur-sm transition group-hover:opacity-100">
-                                {item.atlas}%
-                              </span>
-                            </div>
+                  {comparisonDataset.length === 0 ? (
+                    <p className="text-sm text-white/55">
+                      Run inference to populate the model comparison graph.
+                    </p>
+                  ) : (
+                    comparisonDataset.map((item) => {
+                      const modelValues = visibleChartModels.map(
+                        (model) => item[model.id] ?? 0
+                      );
+                      const peakValue =
+                        modelValues.length > 0 ? Math.max(...modelValues) : 0;
+
+                      return (
+                        <div key={item.label} className="space-y-3">
+                          <div className="flex items-center justify-between text-sm text-white/70">
+                            <span className="truncate text-white/80">
+                              {item.label}
+                            </span>
+                            <span className="text-white/55">
+                              {chartView === "both"
+                                ? `${peakValue}% peak`
+                                : `${peakValue}% confidence`}
+                            </span>
                           </div>
-                        ) : null}
-                        {chartView !== "atlas" ? (
-                          <div className="group relative h-10 overflow-hidden rounded-2xl border border-indigo-200/25 bg-indigo-200/5">
-                            <div
-                              className="absolute inset-y-1 left-1 rounded-[18px] bg-linear-to-r from-indigo-200/80 via-sky-400/80 to-purple-500/85 shadow-[0_22px_70px_-45px_rgba(129,140,248,0.9)] transition-all duration-500"
-                              style={{
-                                width: `${Math.max(
-                                  1,
-                                  Math.min(item.hybrid ?? 0, 100)
-                                )}%`,
-                              }}
-                            >
-                              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-black/35 px-3 py-1 text-[0.7rem] font-semibold text-white opacity-0 backdrop-blur-sm transition group-hover:opacity-100">
-                                {item.hybrid}%
-                              </span>
-                            </div>
+                          <div className="grid gap-2">
+                            {visibleChartModels.map((model) => {
+                              const value = Math.max(
+                                0,
+                                Math.min(item[model.id] ?? 0, 100)
+                              );
+                              const widthPercent =
+                                value === 0 ? 0 : Math.max(1, value);
+                              const style = MODEL_STYLES[model.id] ?? {};
+
+                              return (
+                                <div
+                                  key={`${item.label}-${model.id}`}
+                                  className={`group relative h-10 overflow-hidden rounded-2xl border ${
+                                    style.borderClass ?? "border-white/10"
+                                  } ${style.backgroundClass ?? "bg-white/5"}`}
+                                >
+                                  <div
+                                    className={`absolute inset-y-1 left-1 rounded-[18px] ${
+                                      style.gradientClass ?? "bg-white/50"
+                                    } transition-all duration-500`}
+                                    style={{ width: `${widthPercent}%` }}
+                                  >
+                                    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-black/35 px-3 py-1 text-[0.7rem] font-semibold text-white opacity-0 backdrop-blur-sm transition group-hover:opacity-100">
+                                      {value}%
+                                    </span>
+                                  </div>
+                                  {chartView === "both" ? (
+                                    <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[0.65rem] font-semibold uppercase tracking-[0.22em] text-white/45 opacity-0 transition group-hover:opacity-100">
+                                      {model.label}
+                                    </span>
+                                  ) : null}
+                                </div>
+                              );
+                            })}
                           </div>
-                        ) : null}
-                      </div>
-                    </div>
-                  ))}
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
               </motion.div>
             </motion.div>
