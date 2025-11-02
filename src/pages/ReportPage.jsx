@@ -589,7 +589,7 @@ function ReportPage() {
     [focusDiseaseName]
   );
   const findingName = disease?.name ?? "Selected finding";
-  const previewImageSource = effectiveHeatmap ?? originalImage;
+  const previewImageSource = originalImage;
   const hasReportContent = Boolean(reportContent && reportContent.trim());
   const isTypingReport = hasReportContent && !showPreview;
   const isPreviewReady = hasReportContent && showPreview;
@@ -701,23 +701,47 @@ function ReportPage() {
     setShowPreview(false);
     setCursorVisible(true);
 
-    let index = 0;
     const total = reportContent.length;
-    const content = reportContent;
+    if (total === 0) {
+      const timeoutId = window.setTimeout(() => {
+        setShowPreview(true);
+      }, 300);
+      return () => {
+        window.clearTimeout(timeoutId);
+      };
+    }
 
-    const typeInterval = setInterval(() => {
-      index += 1;
-      setTypedText(content.slice(0, index));
-      if (index >= total) {
-        clearInterval(typeInterval);
-        setTimeout(() => {
-          setShowPreview(true);
-        }, 600);
+    let frameId;
+    let completionTimeout;
+    const durationMs = 5000;
+    const content = reportContent;
+    const startTime = performance.now();
+
+    const step = (timestamp) => {
+      const elapsed = timestamp - startTime;
+      const progress = Math.min(elapsed / durationMs, 1);
+      const nextLength = Math.max(0, Math.round(progress * total));
+      setTypedText(content.slice(0, nextLength));
+
+      if (progress < 1) {
+        frameId = requestAnimationFrame(step);
+        return;
       }
-    }, 14);
+
+      completionTimeout = window.setTimeout(() => {
+        setShowPreview(true);
+      }, 600);
+    };
+
+    frameId = requestAnimationFrame(step);
 
     return () => {
-      clearInterval(typeInterval);
+      if (frameId) {
+        cancelAnimationFrame(frameId);
+      }
+      if (completionTimeout) {
+        window.clearTimeout(completionTimeout);
+      }
     };
   }, [reportContent]);
 
@@ -1140,9 +1164,9 @@ function ReportPage() {
       const includeImage =
         previewImageSource && isRecoverableImageSource(previewImageSource);
       const imageCaption =
-        includeImage && heatmapMethod
-          ? `Uploaded imaging study • ${heatmapMethod}`
-          : "Uploaded imaging study";
+        includeImage && heatmapTopDisease
+          ? `Original imaging study • Focus ${heatmapTopDisease}`
+          : "Original imaging study";
       const imageMetadata = includeImage
         ? await loadImageMetadata(previewImageSource)
         : null;
@@ -1750,10 +1774,9 @@ function ReportPage() {
                                     />
                                   </div>
                                   <figcaption className="mt-3 text-xs text-slate-500">
-                                    Uploaded imaging study · {fileName}
-                                    {heatmapMethod ? ` • ${heatmapMethod}` : ""}
+                                    Original imaging study · {fileName}
                                     {heatmapTopDisease
-                                      ? ` • ${heatmapTopDisease}`
+                                      ? ` • Focus ${heatmapTopDisease}`
                                       : ""}
                                   </figcaption>
                                 </figure>

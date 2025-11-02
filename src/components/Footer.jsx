@@ -1,27 +1,25 @@
 const TEAM = [
   {
     name: "Pavan D",
-    linkedin: "https://www.linkedin.com/in/pavandayand",
+    linkedin: "https://www.linkedin.com/in/pavan-d-856231259/",
     github: "https://github.com/PavanDayanand",
-    portfolio: "https://pavandayand.dev",
+    portfolio: "https://pavan-d.netlify.app/",
   },
   {
     name: "Harsha K L",
-    linkedin: "https://www.linkedin.com/in/harsha-kl",
-    github: "https://github.com/harshakl",
-    portfolio: "https://harshakl.dev",
+    linkedin: "https://www.linkedin.com/in/harsha-k-l-9394b9259/",
+    github: "https://github.com/harshakl03",
+    portfolio: "https://harshakl-portfolio.netlify.app/",
   },
   {
     name: "Eshwar R",
-    linkedin: "https://www.linkedin.com/in/eshwarr",
-    github: "https://github.com/eshwarr",
-    portfolio: "https://eshwarr.io",
+    linkedin: "https://www.linkedin.com/in/eshwar-r-20985131b/",
+    github: "https://github.com/Eshwar3026",
   },
   {
     name: "Mohammed Amaan",
-    linkedin: "https://www.linkedin.com/in/mohammed-amaan",
-    github: "https://github.com/mohammedamaan",
-    portfolio: "https://mohammedamaan.com",
+    linkedin: "https://www.linkedin.com/in/mohammed-amaan-611309309/",
+    github: "https://github.com/MdAmaan026",
   },
 ];
 
