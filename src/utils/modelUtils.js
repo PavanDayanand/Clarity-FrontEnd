@@ -13,7 +13,7 @@ export const MODEL_CONFIG = {
     summary:
       "121-layer dense convolutional network tuned on NIH ChestX-ray14 for balanced recall across pleural findings.",
     badges: ["vision", "baseline"],
-    footnote: "Default model — SHAP enabled",
+    footnote: "Default model — IG & Saliency ready",
   },
   resnet152: {
     id: "resnet152",
@@ -22,7 +22,7 @@ export const MODEL_CONFIG = {
     summary:
       "152-layer residual backbone optimised for rapid triage with faster Grad-CAM generation.",
     badges: ["vision", "speed"],
-    footnote: "Faster heatmaps · no SHAP",
+    footnote: "Faster heatmaps · CAM focused",
   },
 };
 
@@ -39,7 +39,8 @@ const normalizeInput = (value) => {
   return value.toString().trim().toLowerCase();
 };
 
-const sanitizeToken = (value) => normalizeInput(value).replace(/[^a-z0-9]/g, "");
+const sanitizeToken = (value) =>
+  normalizeInput(value).replace(/[^a-z0-9]/g, "");
 
 export const resolveModelKey = (input, fallback = DEFAULT_MODEL_KEY) => {
   const normalized = normalizeInput(input);

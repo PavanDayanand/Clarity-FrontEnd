@@ -67,7 +67,7 @@ export const predictDisease = async (
 
 export const generateHeatmap = async (
   file,
-  { model = "densenet121", method = "gradcam", layer, signal } = {}
+  { model = "densenet121", method = "gradcam_pp", layer, signal } = {}
 ) => {
   const formData = new FormData();
   if (file != null) {

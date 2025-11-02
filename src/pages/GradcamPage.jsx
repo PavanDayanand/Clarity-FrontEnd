@@ -52,7 +52,7 @@ const infoCards = [
 ];
 
 const smoothTransition = { duration: 0.7, ease: [0.16, 1, 0.3, 1] };
-const DEFAULT_HEATMAP_METHOD = "gradcam";
+const DEFAULT_HEATMAP_METHOD = "gradcam_pp";
 
 const MODEL_LAYER_CHOICES = {
   densenet121: [
@@ -500,6 +500,7 @@ function GradcamPage() {
     showPopup,
     topHeatmapDisease,
     topHeatmapProbability,
+    originalImage,
     updateUploadData,
     uploadData.heatmapImage,
     uploadData.heatmapLayer,
@@ -507,10 +508,6 @@ function GradcamPage() {
     uploadData.modelKey,
     uploadData.positiveFindings,
   ]);
-
-  if (!file) {
-    return null;
-  }
 
   const confidencePercent = useMemo(
     () => Math.round(Math.min(Math.max(confidence ?? 0, 0), 1) * 100),
@@ -529,6 +526,17 @@ function GradcamPage() {
     const fallback = selectedMethod || DEFAULT_HEATMAP_METHOD;
     return fallback ? [fallback] : [DEFAULT_HEATMAP_METHOD];
   }, [availableMethods, selectedMethod]);
+  const formatMethodLabel = (value) => {
+    if (!value) {
+      return "";
+    }
+    return value
+      .split("_")
+      .map((segment) =>
+        segment ? segment[0].toUpperCase() + segment.slice(1) : segment
+      )
+      .join(" ");
+  };
   const layerOptionsToRender = useMemo(() => {
     const entries = MODEL_LAYER_CHOICES[activeModelId] ?? [];
 
@@ -650,6 +658,10 @@ function GradcamPage() {
     },
     [activeModelId]
   );
+
+  if (!file) {
+    return null;
+  }
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#031029] text-white">
@@ -792,7 +804,7 @@ function GradcamPage() {
                     >
                       {methodOptionsToRender.map((method) => (
                         <option key={method} value={method}>
-                          {method}
+                          {formatMethodLabel(method)}
                         </option>
                       ))}
                     </select>
@@ -919,7 +931,9 @@ function GradcamPage() {
                 <div className="space-y-1">
                   <p className="text-xs font-medium text-white/70">Method</p>
                   <p className="text-sm font-semibold text-white/85">
-                    {selectedMethod || DEFAULT_HEATMAP_METHOD}
+                    {formatMethodLabel(
+                      selectedMethod || DEFAULT_HEATMAP_METHOD
+                    )}
                   </p>
                 </div>
                 <div className="space-y-1">
