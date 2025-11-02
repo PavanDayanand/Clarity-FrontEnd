@@ -858,7 +858,7 @@ function ReportPage() {
           style={{ width: "44rem", height: "44rem" }}
         />
       </div>
-      <BackgroundGrid className="z-10 opacity-20" />
+      <BackgroundGrid className="z-10 opacity-50" />
 
       <motion.div
         className="pointer-events-none absolute inset-0 z-20 backdrop-blur-[1.5px]"

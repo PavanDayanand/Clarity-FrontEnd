@@ -38,6 +38,18 @@ const MODEL_STYLES = {
     tagTone: "text-cyan-200",
     lineColor: "#38bdf8",
     areaColor: "rgba(56,189,248,0.22)",
+    gradientStops: [
+      "rgba(14,203,255,0.95) 0%",
+      "rgba(34,211,238,0.88) 45%",
+      "rgba(30,64,175,0.92) 100%",
+    ],
+    fillGlow: "0 0 40px -18px rgba(37,99,235,0.85)",
+    valueChipClass:
+      "bg-linear-to-r from-cyan-300/90 via-sky-400/90 to-blue-500/90 text-white shadow-[0_8px_35px_-18px_rgba(56,189,248,0.8)] ring-1 ring-cyan-200/45",
+    valueChipShadow: "0 0 28px -14px rgba(56,189,248,0.9)",
+    valueChipTextShadow: "0 8px 28px rgba(8,14,45,0.75)",
+    labelHoverClass: "text-cyan-100",
+    labelTextShadow: "0 10px 26px rgba(6,11,32,0.8)",
   },
   resnet152: {
     dotClass: "bg-indigo-300",
@@ -48,6 +60,18 @@ const MODEL_STYLES = {
     tagTone: "text-indigo-200",
     lineColor: "#a78bfa",
     areaColor: "rgba(167,139,250,0.22)",
+    gradientStops: [
+      "rgba(168,85,247,0.95) 0%",
+      "rgba(129,140,248,0.9) 40%",
+      "rgba(236,72,153,0.92) 100%",
+    ],
+    fillGlow: "0 0 42px -18px rgba(168,85,247,0.85)",
+    valueChipClass:
+      "bg-linear-to-r from-fuchsia-400/95 via-indigo-400/95 to-purple-500/95 text-white shadow-[0_10px_38px_-20px_rgba(167,139,250,0.8)] ring-1 ring-purple-200/45",
+    valueChipShadow: "0 0 30px -14px rgba(167,139,250,0.9)",
+    valueChipTextShadow: "0 8px 32px rgba(35,6,58,0.82)",
+    labelHoverClass: "text-fuchsia-100",
+    labelTextShadow: "0 10px 28px rgba(35,6,58,0.85)",
   },
 };
 
@@ -600,7 +624,7 @@ function PredictPage() {
       (a, b) => (rankingSource[b] ?? 0) - (rankingSource[a] ?? 0)
     );
 
-    return diseaseList.slice(0, 5).map((diseaseName) => {
+    return diseaseList.slice(0, 3).map((diseaseName) => {
       const entry = { label: diseaseName };
 
       MODEL_KEYS.forEach((modelKey) => {
@@ -1058,7 +1082,7 @@ function PredictPage() {
           style={{ width: "42rem", height: "42rem" }}
         />
       </div>
-      <BackgroundGrid className="z-10 opacity-20" />
+      <BackgroundGrid className="z-10 opacity-50" />
 
       <motion.div
         className="pointer-events-none absolute inset-0 z-20 backdrop-blur-[1.5px]"
@@ -1514,13 +1538,13 @@ function PredictPage() {
                 <div>
                   <h2 className="text-2xl font-semibold sm:text-[2rem]">
                     <span className={heroGradientClass}>
-                      Model comparison funnel
+                      Model comparison graph
                     </span>
                   </h2>
                   <p className="mt-4 max-w-2xl text-sm italic text-white/65 sm:text-base">
-                    Hover the rows or funnel layers to inspect how each
-                    architecture ranks the top five suspected conditions. Toggle
-                    between individual or combined views to isolate behaviour.
+                    Hover the bars to inspect how each architecture rates the
+                    top suspected conditions. Toggle between individual or
+                    combined views to isolate behaviour.
                   </p>
                 </div>
                 <div className="inline-flex rounded-full border border-white/12 bg-white/10 p-1 text-xs font-semibold text-white/60">
@@ -1545,424 +1569,172 @@ function PredictPage() {
                 custom={0.3}
                 className="mt-8 rounded-[40px] border border-white/10 bg-[#060f23]/85 px-8 py-10 shadow-[0_70px_180px_-90px_rgba(37,99,235,0.55)]"
               >
-                {comparisonDataset.length === 0 ? (
-                  <p className="text-sm text-white/55">
-                    Run inference to populate the model comparison graph.
-                  </p>
-                ) : (
-                  <>
-                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-                      {summaryCards.map((card) => {
-                        const toneClass =
-                          card.accentClass ??
-                          (card.tone === "positive"
-                            ? "text-emerald-300"
-                            : card.tone === "negative"
-                            ? "text-rose-300"
-                            : "text-white");
-                        const glowClass =
-                          card.tone === "positive"
-                            ? "shadow-[0_40px_120px_-90px_rgba(16,185,129,0.6)]"
-                            : card.tone === "negative"
-                            ? "shadow-[0_40px_120px_-90px_rgba(239,68,68,0.6)]"
-                            : "shadow-[0_35px_110px_-90px_rgba(37,99,235,0.55)]";
-
-                        return (
-                          <div
-                            key={card.id}
-                            className={`relative overflow-hidden rounded-3xl border border-white/10 bg-[#081227]/85 px-5 py-6 backdrop-blur ${glowClass}`}
-                          >
-                            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,#13295a_0%,transparent_70%)] opacity-75" />
-                            <div className="relative flex flex-col gap-3">
-                              <span className="text-[0.65rem] uppercase tracking-[0.3em] text-white/45">
-                                {card.title}
-                              </span>
-                              <span
-                                className={`text-2xl font-semibold ${toneClass}`}
-                              >
-                                {card.primary}
-                              </span>
-                              <span className="text-sm text-white/60">
-                                {card.secondary}
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <div className="mt-10">
-                      <div className="relative overflow-hidden rounded-4xl border border-white/10 bg-[#050b19]/85 px-6 pb-12 pt-8 shadow-[0_70px_160px_-90px_rgba(37,99,235,0.6)]">
-                        <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-                          <span className="text-[0.7rem] uppercase tracking-[0.3em] text-white/45">
-                            Confidence trajectory
-                          </span>
-                          <div className="flex flex-wrap items-center gap-5 text-[0.7rem] uppercase tracking-[0.28em] text-white/45">
-                            {visibleChartModels.map((model) => {
-                              const style = MODEL_STYLES[model.id] ?? {};
-                              return (
-                                <span
-                                  key={model.id}
-                                  className="flex items-center gap-2"
-                                >
-                                  <span
-                                    className="h-2.5 w-2.5 rounded-full"
-                                    style={{
-                                      backgroundColor:
-                                        style.lineColor ?? "#38bdf8",
-                                    }}
-                                  />
-                                  {model.label}
-                                </span>
-                              );
-                            })}
-                          </div>
-                        </div>
-                        {lineChartConfig ? (
-                          <div className="relative">
-                            <svg
-                              viewBox={lineChartConfig.viewBox}
-                              className="h-80 w-full"
-                              preserveAspectRatio="none"
-                              role="img"
-                              aria-label="Model confidence comparison chart"
-                              onMouseLeave={() => setChartHoverIndex(null)}
-                            >
-                              <defs>
-                                <linearGradient
-                                  id="chart-background-gradient"
-                                  x1="0"
-                                  y1="0"
-                                  x2="0"
-                                  y2="1"
-                                >
-                                  <stop
-                                    offset="0%"
-                                    stopColor="rgba(12,24,52,0.95)"
-                                  />
-                                  <stop
-                                    offset="100%"
-                                    stopColor="rgba(5,11,25,0.95)"
-                                  />
-                                </linearGradient>
-                              </defs>
-                              <rect
-                                x="0"
-                                y="0"
-                                width={lineChartConfig.width}
-                                height={lineChartConfig.height}
-                                fill="url(#chart-background-gradient)"
-                              />
-                              <g>
-                                {lineChartConfig.yTicks.map((tick, index) => (
-                                  <g key={`y-${index}`}>
-                                    <line
-                                      x1={lineChartConfig.margin.left}
-                                      x2={
-                                        lineChartConfig.width -
-                                        lineChartConfig.margin.right
-                                      }
-                                      y1={tick.y}
-                                      y2={tick.y}
-                                      stroke="rgba(148,197,255,0.18)"
-                                      strokeDasharray="6 6"
-                                    />
-                                    <text
-                                      x={lineChartConfig.margin.left - 18}
-                                      y={tick.y + 4}
-                                      textAnchor="end"
-                                      fontSize="12"
-                                      fill="rgba(226,232,240,0.55)"
-                                    >
-                                      {tick.value}
-                                    </text>
-                                  </g>
-                                ))}
-                              </g>
-                              <line
-                                x1={lineChartConfig.margin.left}
-                                x2={lineChartConfig.margin.left}
-                                y1={lineChartConfig.margin.top}
-                                y2={
-                                  lineChartConfig.height -
-                                  lineChartConfig.margin.bottom
-                                }
-                                stroke="rgba(148,197,255,0.28)"
-                              />
-                              <line
-                                x1={lineChartConfig.margin.left}
-                                x2={
-                                  lineChartConfig.width -
-                                  lineChartConfig.margin.right
-                                }
-                                y1={
-                                  lineChartConfig.height -
-                                  lineChartConfig.margin.bottom
-                                }
-                                y2={
-                                  lineChartConfig.height -
-                                  lineChartConfig.margin.bottom
-                                }
-                                stroke="rgba(148,197,255,0.28)"
-                              />
-                              {effectiveComparisonIndex != null &&
-                              effectiveComparisonIndex <
-                                lineChartConfig.xPositions.length ? (
-                                <line
-                                  x1={
-                                    lineChartConfig.xPositions[
-                                      effectiveComparisonIndex
-                                    ]
-                                  }
-                                  x2={
-                                    lineChartConfig.xPositions[
-                                      effectiveComparisonIndex
-                                    ]
-                                  }
-                                  y1={lineChartConfig.margin.top - 6}
-                                  y2={
-                                    lineChartConfig.height -
-                                    lineChartConfig.margin.bottom +
-                                    10
-                                  }
-                                  stroke="rgba(148,197,255,0.35)"
-                                  strokeDasharray="4 6"
-                                />
-                              ) : null}
-                              {lineChartConfig.lines.map((line) => (
-                                <g key={`line-${line.model.id}`}>
-                                  <path
-                                    d={line.areaPath}
-                                    fill={line.areaColor}
-                                    opacity={chartView === "both" ? 0.22 : 0.3}
-                                  />
-                                  <path
-                                    d={line.linePath}
-                                    fill="none"
-                                    stroke={line.lineColor}
-                                    strokeWidth={3.5}
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    opacity={chartView === "both" ? 0.9 : 1}
-                                  />
-                                  {line.points.map((point, pointIndex) => {
-                                    const isFocused =
-                                      pointIndex === effectiveComparisonIndex;
-                                    return (
-                                      <circle
-                                        key={`point-${line.model.id}-${pointIndex}`}
-                                        cx={point.x}
-                                        cy={point.y}
-                                        r={isFocused ? 6 : 4}
-                                        fill={line.lineColor}
-                                        stroke="#0f172a"
-                                        strokeWidth={2.2}
-                                        className="cursor-pointer transition-transform duration-200"
-                                        tabIndex={0}
-                                        onMouseEnter={() =>
-                                          setChartHoverIndex(pointIndex)
-                                        }
-                                        onFocus={() =>
-                                          setChartHoverIndex(pointIndex)
-                                        }
-                                        onClick={() => {
-                                          setActiveComparisonIndex(pointIndex);
-                                          setChartHoverIndex(null);
-                                        }}
-                                        onKeyDown={(event) => {
-                                          if (
-                                            event.key === "Enter" ||
-                                            event.key === " "
-                                          ) {
-                                            event.preventDefault();
-                                            setActiveComparisonIndex(
-                                              pointIndex
-                                            );
-                                            setChartHoverIndex(null);
-                                          }
-                                        }}
-                                      />
-                                    );
-                                  })}
-                                </g>
-                              ))}
-                              <g>
-                                {lineChartConfig.labels.map((label, index) => (
-                                  <text
-                                    key={`x-${label}`}
-                                    x={lineChartConfig.xPositions[index]}
-                                    y={
-                                      lineChartConfig.height -
-                                      lineChartConfig.margin.bottom +
-                                      28
-                                    }
-                                    textAnchor="middle"
-                                    fontSize="12"
-                                    fill="rgba(226,232,240,0.65)"
-                                  >
-                                    {label}
-                                  </text>
-                                ))}
-                              </g>
-                            </svg>
-                            {effectiveComparisonEntry &&
-                            effectiveComparisonIndex != null &&
-                            effectiveComparisonIndex <
-                              lineChartConfig.xPercents.length ? (
-                              <div
-                                className="pointer-events-none absolute top-4 flex -translate-x-1/2 flex-col gap-2 rounded-3xl border border-white/10 bg-[#0b1737]/90 px-4 py-3 text-xs text-white/70 shadow-[0_25px_60px_-40px_rgba(37,99,235,0.75)] backdrop-blur"
-                                style={{
-                                  left: `${
-                                    lineChartConfig.xPercents[
-                                      effectiveComparisonIndex
-                                    ] * 100
-                                  }%`,
-                                }}
-                              >
-                                <span className="text-[0.7rem] uppercase tracking-[0.26em] text-white/45">
-                                  {effectiveComparisonEntry.label.replace(
-                                    /_/g,
-                                    " "
-                                  )}
-                                </span>
-                                <div className="flex flex-col gap-1 text-sm text-white/75">
-                                  {visibleChartModels.map((model) => (
-                                    <span
-                                      key={`tooltip-${model.id}`}
-                                      className="flex items-center justify-between gap-4"
-                                    >
-                                      <span className="flex items-center gap-2">
-                                        <span
-                                          className="h-2 w-2 rounded-full"
-                                          style={{
-                                            backgroundColor:
-                                              MODEL_STYLES[model.id]
-                                                ?.lineColor ?? "#38bdf8",
-                                          }}
-                                        />
-                                        {model.label}
-                                      </span>
-                                      <span className="font-semibold">
-                                        {Math.round(
-                                          effectiveComparisonEntry[model.id] ??
-                                            0
-                                        )}
-                                        %
-                                      </span>
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
-                            ) : null}
-                          </div>
-                        ) : null}
-                      </div>
-                    </div>
-                    <div className="mt-10 overflow-hidden rounded-4xl border border-white/10 bg-[#060f23]/75">
-                      <div className="px-6 py-4">
-                        <div className="flex items-center gap-4 text-[0.65rem] uppercase tracking-[0.26em] text-white/45">
-                          <span className="flex-1">Condition</span>
-                          {visibleChartModels.map((model) => (
-                            <span
-                              key={`header-${model.id}`}
-                              className="w-24 text-right"
-                            >
-                              {model.label.split(" ")[0]}
-                            </span>
+                <div className="flex flex-wrap items-center gap-5 text-[0.7rem] uppercase tracking-[0.32em] text-white/45">
+                  {visibleChartModels.map((model) => {
+                    const style = MODEL_STYLES[model.id] ?? {};
+                    return (
+                      <span
+                        key={model.id}
+                        className="inline-flex items-center gap-2"
+                      >
+                        <span
+                          className={`h-2.5 w-2.5 rounded-full ${
+                            style.dotClass ?? "bg-cyan-300"
+                          }`}
+                        />
+                        {model.label}
+                      </span>
+                    );
+                  })}
+                </div>
+                <div className="mt-6">
+                  {comparisonDataset.length === 0 ? (
+                    <p className="text-sm text-white/55">
+                      Run inference to populate the model comparison graph.
+                    </p>
+                  ) : (
+                    <>
+                      <div className="relative mb-6">
+                        <div className="flex justify-between px-6 text-[0.65rem] font-semibold uppercase tracking-[0.24em] text-white/35">
+                          {["0%", "25%", "50%", "75%", "100%"].map((mark) => (
+                            <span key={mark}>{mark}</span>
                           ))}
-                          <span className="w-16 text-right">Peak</span>
                         </div>
+                        <div className="mt-2 h-px w-full rounded-full bg-linear-to-r from-white/5 via-white/10 to-white/5" />
                       </div>
-                      <div className="divide-y divide-white/5">
-                        {comparisonDataset.map((item, index) => {
-                          const isActive = index === effectiveComparisonIndex;
-                          const peakValue = Math.max(
-                            ...visibleChartModels.map(
-                              (model) => item[model.id] ?? 0
-                            )
+                      <div className="flex flex-col gap-6">
+                        {comparisonDataset.map((item, itemIndex) => {
+                          const modelValues = visibleChartModels.map(
+                            (model) => item[model.id] ?? 0
                           );
+                          const peakValue =
+                            modelValues.length > 0
+                              ? Math.max(...modelValues)
+                              : 0;
 
                           return (
-                            <button
-                              key={`row-${item.label}`}
-                              type="button"
-                              onMouseEnter={() => setChartHoverIndex(index)}
-                              onFocus={() => setChartHoverIndex(index)}
-                              onMouseLeave={() => setChartHoverIndex(null)}
-                              onBlur={() => setChartHoverIndex(null)}
-                              onClick={() => {
-                                setActiveComparisonIndex(index);
-                                setChartHoverIndex(null);
-                              }}
-                              className={`flex w-full items-center gap-4 px-6 py-4 text-left transition ${
-                                isActive
-                                  ? "bg-white/10 text-white shadow-[0_35px_90px_-80px_rgba(56,189,248,0.6)]"
-                                  : "text-white/70 hover:bg-white/5 hover:text-white"
-                              }`}
-                            >
-                              <span className="flex-1 text-sm font-semibold">
-                                {item.label.replace(/_/g, " ")}
-                              </span>
-                              {visibleChartModels.map((model) => (
-                                <span
-                                  key={`row-${item.label}-${model.id}`}
-                                  className="w-24 text-right text-sm font-semibold"
-                                >
-                                  {Math.round(item[model.id] ?? 0)}%
+                            <div key={item.label} className="space-y-3">
+                              <div className="flex items-center justify-between text-sm text-white/70">
+                                <span className="truncate text-white/80">
+                                  {item.label}
                                 </span>
-                              ))}
-                              <span className="w-16 text-right text-sm font-semibold text-white/80">
-                                {Math.round(peakValue)}%
-                              </span>
-                            </button>
+                                <span className="text-white/55">
+                                  {chartView === "both"
+                                    ? `${peakValue}% peak`
+                                    : `${peakValue}% confidence`}
+                                </span>
+                              </div>
+                              <div className="grid gap-2">
+                                {visibleChartModels.map((model, modelIndex) => {
+                                  const value = Math.max(
+                                    0,
+                                    Math.min(item[model.id] ?? 0, 100)
+                                  );
+                                  const widthPercent =
+                                    value === 0 ? 0 : Math.max(1, value);
+                                  const style = MODEL_STYLES[model.id] ?? {};
+                                  const fillGradientStops =
+                                    Array.isArray(style.gradientStops) &&
+                                    style.gradientStops.length > 0
+                                      ? style.gradientStops
+                                      : [
+                                          `${
+                                            style.lineColor ??
+                                            "rgba(56,189,248,0.85)"
+                                          } 0%`,
+                                          "rgba(255,255,255,0.35) 55%",
+                                          `${
+                                            style.areaColor ??
+                                            "rgba(56,189,248,0.25)"
+                                          } 100%`,
+                                        ];
+                                  const fillGradient = `linear-gradient(90deg, ${fillGradientStops.join(
+                                    ", "
+                                  )})`;
+                                  const transitionDelay =
+                                    itemIndex * 0.12 + modelIndex * 0.08;
+                                  const valueChipClass =
+                                    style.valueChipClass ??
+                                    "bg-white/20 text-white shadow-[0_8px_30px_-22px_rgba(148,163,184,0.8)] ring-1 ring-white/15";
+                                  const valueChipStyle =
+                                    style.valueChipShadow ||
+                                    style.valueChipTextShadow
+                                      ? {
+                                          boxShadow:
+                                            style.valueChipShadow ?? undefined,
+                                          textShadow:
+                                            style.valueChipTextShadow ??
+                                            undefined,
+                                        }
+                                      : undefined;
+                                  const labelHoverClass =
+                                    style.labelHoverClass ?? "text-white/60";
+                                  const labelHoverStyle = style.labelTextShadow
+                                    ? {
+                                        textShadow:
+                                          style.labelTextShadow ?? undefined,
+                                      }
+                                    : undefined;
+
+                                  return (
+                                    <div
+                                      key={`${item.label}-${model.id}`}
+                                      className={`group relative h-10 overflow-hidden rounded-2xl border ${
+                                        style.borderClass ?? "border-white/10"
+                                      } ${
+                                        style.backgroundClass ?? "bg-white/5"
+                                      }`}
+                                    >
+                                      <motion.div
+                                        initial={{ width: 0 }}
+                                        animate={{ width: `${widthPercent}%` }}
+                                        transition={{
+                                          duration: 1.1,
+                                          ease: "easeOut",
+                                          delay: transitionDelay,
+                                        }}
+                                        className={`absolute inset-y-1 left-1 rounded-[18px] ${
+                                          style.gradientClass ?? "bg-white/50"
+                                        }`}
+                                        style={{
+                                          backgroundImage: fillGradient,
+                                          boxShadow:
+                                            style.fillGlow ?? undefined,
+                                        }}
+                                      >
+                                        <span
+                                          className={`pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 inline-flex items-center gap-3 rounded-full px-4 py-1.5 text-sm font-semibold text-white opacity-0 backdrop-blur-md transition group-hover:opacity-100 ${valueChipClass}`}
+                                          style={valueChipStyle}
+                                        >
+                                          {chartView !== "both" ? (
+                                            <span className="text-[0.62rem] font-semibold uppercase tracking-[0.28em] text-white/85 drop-shadow-[0_6px_18px_rgba(8,14,45,0.65)]">
+                                              {model.label}
+                                            </span>
+                                          ) : null}
+                                          <span className="text-[0.95rem] font-black text-white drop-shadow-[0_7px_20px_rgba(8,14,45,0.78)]">
+                                            {value}%
+                                          </span>
+                                        </span>
+                                      </motion.div>
+                                      {chartView === "both" ? (
+                                        <span
+                                          className={`pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[0.68rem] font-semibold uppercase tracking-[0.24em] opacity-0 transition group-hover:opacity-100 ${labelHoverClass}`}
+                                          style={labelHoverStyle}
+                                        >
+                                          {model.label}
+                                        </span>
+                                      ) : null}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
                           );
                         })}
                       </div>
-                    </div>
-                    {effectiveComparisonEntry ? (
-                      <div className="mt-8 rounded-3xl border border-white/10 bg-[#0b1633]/80 p-6 text-sm text-white/65 sm:text-base">
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                          <h4 className="text-lg font-semibold text-white/85">
-                            {effectiveComparisonEntry.label.replace(/_/g, " ")}
-                          </h4>
-                          <span className="text-sm font-semibold text-cyan-200">
-                            Peak{" "}
-                            {Math.max(
-                              ...visibleChartModels.map(
-                                (model) =>
-                                  effectiveComparisonEntry[model.id] ?? 0
-                              )
-                            )}
-                            %
-                          </span>
-                        </div>
-                        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                          {visibleChartModels.map((model) => {
-                            const value = Math.max(
-                              0,
-                              Math.min(
-                                effectiveComparisonEntry[model.id] ?? 0,
-                                100
-                              )
-                            );
-                            return (
-                              <div
-                                key={`detail-${model.id}`}
-                                className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3"
-                              >
-                                <span className="font-semibold text-white/85">
-                                  {model.label}
-                                </span>
-                                <span className="text-sm font-semibold text-white/75">
-                                  {value}%
-                                </span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ) : null}
-                  </>
-                )}
+                    </>
+                  )}
+                </div>
               </motion.div>
             </motion.div>
           </motion.section>
