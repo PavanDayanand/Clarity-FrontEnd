@@ -1414,7 +1414,7 @@ function App() {
             transition={{ duration: 1.1, ease: [0.22, 1, 0.36, 1] }}
             src="/Chest%20X-ray%20Label%20250.jpg"
             alt="Annotated lateral chest X-ray highlighting key structures"
-            className="pointer-events-none absolute left-0 top-24 hidden w-64 max-w-full select-none opacity-70 drop-shadow-[0_40px_80px_rgba(6,18,42,0.65)] lg:block xl:left-10 xl:top-16 xl:w-72"
+            className="pointer-events-none absolute hidden left-8 top-28 w-56 max-w-full select-none opacity-70 lg:block xl:left-16 xl:top-20 xl:w-64"
             style={{
               WebkitMaskImage:
                 "radial-gradient(circle at center, rgba(0,0,0,1) 58%, rgba(0,0,0,0) 92%)",
@@ -1424,7 +1424,6 @@ function App() {
               maskSize: "125% 125%",
               WebkitMaskRepeat: "no-repeat",
               maskRepeat: "no-repeat",
-              filter: "drop-shadow(0 55px 90px rgba(8,20,52,0.85))",
             }}
             loading="lazy"
           />
@@ -1438,7 +1437,7 @@ function App() {
             }}
             src="/CXRNLPA%20250.jpg"
             alt="Annotated frontal chest X-ray identifying organs"
-            className="pointer-events-none absolute right-0 top-32 hidden w-64 max-w-full select-none opacity-70 drop-shadow-[0_40px_80px_rgba(6,18,42,0.65)] lg:block xl:right-10 xl:top-20 xl:w-72"
+            className="pointer-events-none absolute hidden right-8 top-32 w-56 max-w-full select-none opacity-70 lg:block xl:right-16 xl:top-24 xl:w-64"
             style={{
               WebkitMaskImage:
                 "radial-gradient(circle at center, rgba(0,0,0,1) 58%, rgba(0,0,0,0) 92%)",
@@ -1448,7 +1447,6 @@ function App() {
               maskSize: "125% 125%",
               WebkitMaskRepeat: "no-repeat",
               maskRepeat: "no-repeat",
-              filter: "drop-shadow(0 55px 90px rgba(8,20,52,0.85))",
             }}
             loading="lazy"
           />

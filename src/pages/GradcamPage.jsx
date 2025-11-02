@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
 import { buttonDotClasses, primaryButtonClasses } from "../styles/ui.js";
@@ -19,6 +19,7 @@ import {
 import { useUpload } from "../context/UploadContext.jsx";
 import {
   DEFAULT_MODEL_KEY,
+  MODEL_LIST,
   resolveModelKey,
   resolveModelLabel,
 } from "../utils/modelUtils.js";
@@ -44,6 +45,119 @@ const infoCards = [
 
 const smoothTransition = { duration: 0.7, ease: [0.16, 1, 0.3, 1] };
 const DEFAULT_HEATMAP_METHOD = "gradcam";
+
+const MODEL_LAYER_CHOICES = {
+  densenet121: [
+    {
+      label: "Initial Feature Extraction",
+      value: "features.denseblock1.denselayer1",
+    },
+    {
+      label: "Early Refinement",
+      value: "features.denseblock1.denselayer3",
+    },
+    {
+      label: "Mid Enhancement",
+      value: "features.denseblock1.denselayer6",
+    },
+    {
+      label: "Feature Amplification Start",
+      value: "features.denseblock2.denselayer1",
+    },
+    {
+      label: "Intermediate Depth",
+      value: "features.denseblock2.denselayer6",
+    },
+    {
+      label: "Advanced Representation",
+      value: "features.denseblock2.denselayer12",
+    },
+    {
+      label: "Deep Features Start",
+      value: "features.denseblock3.denselayer1",
+    },
+    {
+      label: "Mid-Level Deep Features",
+      value: "features.denseblock3.denselayer8",
+    },
+    {
+      label: "Late-Stage Deep Features",
+      value: "features.denseblock3.denselayer16",
+    },
+    {
+      label: "Deep Feature Aggregation",
+      value: "features.denseblock3.denselayer24",
+    },
+    {
+      label: "Final Block Start",
+      value: "features.denseblock4.denselayer1",
+    },
+    {
+      label: "Penultimate Layer",
+      value: "features.denseblock4.denselayer8",
+    },
+    {
+      label: "Final Layer Features",
+      value: "features.denseblock4.denselayer16",
+    },
+  ],
+  resnet152: [
+    {
+      label: "Initial Residual Block Start",
+      value: "layer1.0",
+    },
+    {
+      label: "Residual Block Refinement 1",
+      value: "layer1.1",
+    },
+    {
+      label: "Residual Block Refinement 2",
+      value: "layer1.2",
+    },
+    {
+      label: "Downsampled Starts",
+      value: "layer2.0",
+    },
+    {
+      label: "Middle Residual Block",
+      value: "layer2.3",
+    },
+    {
+      label: "Depth-Enhanced Block",
+      value: "layer2.7",
+    },
+    {
+      label: "Deep Residual Block Start",
+      value: "layer3.0",
+    },
+    {
+      label: "Midway Deep Block",
+      value: "layer3.11",
+    },
+    {
+      label: "Late Deep Residual Block",
+      value: "layer3.23",
+    },
+    {
+      label: "Deep Block Conclusion",
+      value: "layer3.35",
+    },
+    {
+      label: "Final Residual Block Start",
+      value: "layer4.0",
+    },
+    {
+      label: "Penultimate Residual Block",
+      value: "layer4.1",
+    },
+    {
+      label: "Final Residual Block",
+      value: "layer4.2",
+    },
+  ],
+};
+
+const modelOptions = MODEL_LIST;
 
 function GradcamPage() {
   const navigate = useNavigate();
@@ -72,15 +186,38 @@ function GradcamPage() {
     locationState.predictions ?? uploadData.predictions ?? null;
   const positiveFindings =
     locationState.positiveFindings ?? uploadData.positiveFindings ?? [];
-  const modelKey = resolveModelKey(
+  const initialModelKey = resolveModelKey(
     locationState.modelKey ??
       uploadData.modelKey ??
       uploadData.modelDisplayName ??
       DEFAULT_MODEL_KEY
   );
-  const modelLabel = resolveModelLabel(
-    locationState.modelDisplayName ?? uploadData.modelDisplayName ?? modelKey
-  );
+  const [activeModelId, setActiveModelId] = useState(initialModelKey);
+  const activeModelLabel = useMemo(() => {
+    if (
+      uploadData.modelKey &&
+      resolveModelKey(uploadData.modelKey) === activeModelId &&
+      uploadData.modelDisplayName
+    ) {
+      return resolveModelLabel(uploadData.modelDisplayName);
+    }
+
+    if (
+      locationState.modelKey &&
+      resolveModelKey(locationState.modelKey) === activeModelId &&
+      locationState.modelDisplayName
+    ) {
+      return resolveModelLabel(locationState.modelDisplayName);
+    }
+
+    return resolveModelLabel(activeModelId);
+  }, [
+    activeModelId,
+    locationState.modelDisplayName,
+    locationState.modelKey,
+    uploadData.modelDisplayName,
+    uploadData.modelKey,
+  ]);
   const defaultMethod =
     locationState.heatmapMethod ??
     uploadData.heatmapMethod ??
@@ -132,10 +269,10 @@ function GradcamPage() {
     const loadConfiguration = async () => {
       try {
         const [methodsResult, layersResult] = await Promise.allSettled([
-          getAvailableMethods(modelKey, {
+          getAvailableMethods(activeModelId, {
             signal: methodsController.signal,
           }),
-          getAvailableLayers(modelKey, {
+          getAvailableLayers(activeModelId, {
             signal: layersController.signal,
           }),
         ]);
@@ -194,7 +331,7 @@ function GradcamPage() {
       methodsController.abort();
       layersController.abort();
     };
-  }, [file, modelKey]);
+  }, [file, activeModelId]);
 
   useEffect(() => {
     if (!file) {
@@ -212,7 +349,8 @@ function GradcamPage() {
       cachedMethod.toLowerCase() ===
         (selectedMethod || DEFAULT_HEATMAP_METHOD).toLowerCase() &&
       cachedLayer === normalizedLayer &&
-      uploadData.modelKey === modelKey
+      uploadData.modelKey &&
+      resolveModelKey(uploadData.modelKey) === activeModelId
     ) {
       setHeatmapImage(cachedImage);
       setHeatmapError(null);
@@ -227,7 +365,7 @@ function GradcamPage() {
     setHeatmapError(null);
 
     generateHeatmap(file, {
-      model: modelKey,
+      model: activeModelId,
       method: selectedMethod || DEFAULT_HEATMAP_METHOD,
       layer: normalizedLayer || undefined,
       signal: controller.signal,
@@ -250,7 +388,9 @@ function GradcamPage() {
         const resolvedMethod =
           data?.method_used ?? selectedMethod ?? DEFAULT_HEATMAP_METHOD;
         const resolvedLayer = data?.layer_used ?? normalizedLayer ?? "";
-        const responseModelKey = resolveModelKey(data?.model_used ?? modelKey);
+        const responseModelKey = resolveModelKey(
+          data?.model_used ?? activeModelId
+        );
         const responseModelLabel = resolveModelLabel(
           data?.model_used ?? responseModelKey
         );
@@ -305,7 +445,7 @@ function GradcamPage() {
   }, [
     file,
     initialHeatmapImage,
-    modelKey,
+    activeModelId,
     predictions,
     selectedLayer,
     selectedMethod,
@@ -342,11 +482,34 @@ function GradcamPage() {
     return fallback ? [fallback] : [DEFAULT_HEATMAP_METHOD];
   }, [availableMethods, selectedMethod]);
   const layerOptionsToRender = useMemo(() => {
+    const entries = MODEL_LAYER_CHOICES[activeModelId] ?? [];
+
     if (availableLayers.length > 0) {
-      return availableLayers;
+      const availableSet = new Set(availableLayers);
+      const filtered = entries.filter((entry) => availableSet.has(entry.value));
+      if (filtered.length > 0) {
+        return filtered;
+      }
+      return availableLayers.map((value) => ({ label: value, value }));
     }
-    return selectedLayer ? [selectedLayer] : [];
-  }, [availableLayers, selectedLayer]);
+
+    if (entries.length > 0) {
+      return entries;
+    }
+
+    return selectedLayer
+      ? [{ label: selectedLayer, value: selectedLayer }]
+      : [];
+  }, [availableLayers, activeModelId, selectedLayer]);
+
+  const selectedLayerLabel = useMemo(() => {
+    if (!selectedLayer) {
+      return "Auto";
+    }
+    const entries = MODEL_LAYER_CHOICES[activeModelId] ?? [];
+    const match = entries.find((entry) => entry.value === selectedLayer);
+    return match?.label ?? selectedLayer;
+  }, [activeModelId, selectedLayer]);
   const topPredictionChart = useMemo(() => {
     if (!predictions || typeof predictions !== "object") {
       return [];
@@ -390,8 +553,8 @@ function GradcamPage() {
           file,
           predictions,
           positiveFindings,
-          modelKey,
-          modelDisplayName: modelLabel,
+          modelKey: activeModelId,
+          modelDisplayName: activeModelLabel,
           heatmapMethod: selectedMethod || DEFAULT_HEATMAP_METHOD,
           heatmapLayer: selectedLayer || "",
           heatmapTopDisease: topHeatmapDisease,
@@ -401,9 +564,48 @@ function GradcamPage() {
     );
   };
 
+  const handleDownloadImage = useCallback(() => {
+    const currentSource =
+      viewMode === "heatmap" ? effectiveHeatmap : originalImage;
+
+    if (!currentSource) {
+      return;
+    }
+
+    const link = document.createElement("a");
+    link.href = currentSource;
+    const extension = currentSource.startsWith("data:image/png")
+      ? "png"
+      : currentSource.startsWith("data:image/jpeg")
+      ? "jpg"
+      : "png";
+    const baseName =
+      viewMode === "heatmap" ? "gradcam-visual" : "original-upload";
+    link.download = `${baseName}.${extension}`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }, [effectiveHeatmap, originalImage, viewMode]);
+
+  const handleModelChange = useCallback(
+    (nextModelId) => {
+      const normalized = resolveModelKey(nextModelId, activeModelId);
+      if (normalized === activeModelId) {
+        return;
+      }
+
+      setActiveModelId(normalized);
+      setAvailableMethods([]);
+      setAvailableLayers([]);
+      setSelectedLayer("");
+      setHeatmapError(null);
+    },
+    [activeModelId]
+  );
+
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#031029] text-white">
-      <ScrollIndicator />
+      <ScrollIndicator className="right-3 sm:right-5 md:right-7 lg:right-12" />
       <PageBackdrop variant="gradcam" />
       <BackgroundGrid className="z-10 opacity-50" />
 
@@ -475,9 +677,9 @@ function GradcamPage() {
             initial={{ opacity: 0, y: 40 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ ...smoothTransition, delay: 0.2 }}
-            className="mt-14 flex w-full flex-col gap-8 lg:flex-row"
+            className="mt-14 mx-auto flex w-full max-w-6xl flex-col gap-8 px-2 sm:px-6 lg:flex-row"
           >
-            <div className="flex w-full flex-col gap-6 rounded-[34px] border border-white/10 bg-white/5 p-8 backdrop-blur-2xl">
+            <div className="flex w-full flex-col gap-6 rounded-[34px] border border-white/10 bg-white/5 px-5 py-8 sm:px-7 backdrop-blur-2xl">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="text-left">
                   <h2 className="text-xl font-semibold text-white/90 sm:text-2xl">
@@ -500,7 +702,7 @@ function GradcamPage() {
                           key={option.id}
                           type="button"
                           onClick={() => setViewMode(option.id)}
-                          className={`relative rounded-full px-4 py-2 text-xs font-semibold transition ${
+                          className={`relative rounded-full px-5 py-2 text-xs font-semibold transition whitespace-nowrap ${
                             isActive
                               ? "text-[#1ccad8]"
                               : "text-white/60 hover:text-white/80"
@@ -526,8 +728,8 @@ function GradcamPage() {
               </div>
 
               <div className="grid gap-4 pt-2 sm:grid-cols-2">
-                <label className="flex flex-col gap-2 text-left text-[0.7rem] font-semibold uppercase tracking-[0.28em] text-white/50">
-                  <span className="text-[0.7rem] tracking-[0.28em] text-white/60">
+                <label className="flex flex-col gap-2 text-left text-sm font-semibold text-white/65">
+                  <span className="text-sm font-medium text-white/80">
                     Method
                   </span>
                   <div className="relative">
@@ -547,7 +749,7 @@ function GradcamPage() {
                       ))}
                     </select>
                     <svg
-                      className="pointer-events-none absolute right-4 top-1/2 h-3 w-3 -translate-y-1/2 text-white/40"
+                      className="pointer-events-none absolute right-4 top-1/2 h-3 w-3 -translate-y-1/2 text-white/70"
                       viewBox="0 0 12 12"
                       fill="none"
                       xmlns="http://www.w3.org/2000/svg"
@@ -562,8 +764,8 @@ function GradcamPage() {
                     </svg>
                   </div>
                 </label>
-                <label className="flex flex-col gap-2 text-left text-[0.7rem] font-semibold uppercase tracking-[0.28em] text-white/50">
-                  <span className="text-[0.7rem] tracking-[0.28em] text-white/60">
+                <label className="flex flex-col gap-2 text-left text-sm font-semibold text-white/65">
+                  <span className="text-sm font-medium text-white/80">
                     Layer
                   </span>
                   <div className="relative">
@@ -578,13 +780,13 @@ function GradcamPage() {
                     >
                       <option value="">Auto (recommended)</option>
                       {layerOptionsToRender.map((layer) => (
-                        <option key={layer} value={layer}>
-                          {layer}
+                        <option key={layer.value} value={layer.value}>
+                          {layer.label}
                         </option>
                       ))}
                     </select>
                     <svg
-                      className="pointer-events-none absolute right-4 top-1/2 h-3 w-3 -translate-y-1/2 text-white/40"
+                      className="pointer-events-none absolute right-4 top-1/2 h-3 w-3 -translate-y-1/2 text-white/70"
                       viewBox="0 0 12 12"
                       fill="none"
                       xmlns="http://www.w3.org/2000/svg"
@@ -601,14 +803,14 @@ function GradcamPage() {
                 </label>
               </div>
 
-              <div className="relative overflow-hidden rounded-[28px] border border-white/5 bg-black/60 shadow-[0_50px_110px_-60px_rgba(37,99,235,0.6)]">
+              <div className="relative flex w-full items-center justify-center overflow-hidden rounded-[28px] border border-white/5 bg-black/60 px-4 py-6 shadow-[0_50px_110px_-60px_rgba(37,99,235,0.6)]">
                 <AnimatePresence mode="wait">
                   {viewMode === "original" ? (
                     <motion.img
                       key="original"
                       src={originalImage}
                       alt="Original chest radiograph"
-                      className="h-104 w-full object-cover"
+                      className="h-auto w-full max-w-2xl object-contain"
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
@@ -617,7 +819,7 @@ function GradcamPage() {
                   ) : (
                     <motion.div
                       key="heatmap"
-                      className="relative h-104 w-full"
+                      className="relative flex h-full w-full items-center justify-center"
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
@@ -626,7 +828,7 @@ function GradcamPage() {
                       <img
                         src={effectiveHeatmap}
                         alt="Grad-CAM heatmap"
-                        className="h-full w-full object-cover"
+                        className="h-auto w-full max-w-2xl object-contain"
                       />
                       {isHeatmapLoading ? (
                         <div className="absolute inset-0 flex items-center justify-center bg-black/55 backdrop-blur-sm">
@@ -642,6 +844,17 @@ function GradcamPage() {
                 </AnimatePresence>
               </div>
 
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={handleDownloadImage}
+                  className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-5 py-2 text-sm font-semibold text-white/85 transition hover:border-cyan-300/40 hover:bg-white/15"
+                >
+                  <span className="inline-flex h-2 w-2 rounded-full bg-cyan-300" />
+                  Download {viewMode === "heatmap" ? "Grad-CAM" : "Original"}
+                </button>
+              </div>
+
               {heatmapError ? (
                 <p className="text-sm font-medium text-rose-300">
                   {heatmapError}
@@ -650,31 +863,25 @@ function GradcamPage() {
 
               <div className="grid gap-4 rounded-3xl border border-white/10 bg-white/5 p-5 text-xs text-white/60 sm:grid-cols-2 sm:text-sm">
                 <div className="space-y-1">
-                  <p className="text-[0.65rem] uppercase tracking-[0.28em] text-white/50">
-                    Model
-                  </p>
+                  <p className="text-xs font-medium text-white/70">Model</p>
                   <p className="text-sm font-semibold text-white/85">
-                    {modelLabel}
+                    {activeModelLabel}
                   </p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-[0.65rem] uppercase tracking-[0.28em] text-white/50">
-                    Method
-                  </p>
+                  <p className="text-xs font-medium text-white/70">Method</p>
                   <p className="text-sm font-semibold text-white/85">
                     {selectedMethod || DEFAULT_HEATMAP_METHOD}
                   </p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-[0.65rem] uppercase tracking-[0.28em] text-white/50">
-                    Layer
-                  </p>
+                  <p className="text-xs font-medium text-white/70">Layer</p>
                   <p className="text-sm font-semibold text-white/85">
-                    {selectedLayer ? selectedLayer : "Auto"}
+                    {selectedLayerLabel}
                   </p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-[0.65rem] uppercase tracking-[0.28em] text-white/50">
+                  <p className="text-xs font-medium text-white/70">
                     Peak Focus
                   </p>
                   <p className="text-sm font-semibold text-white/85">
@@ -699,12 +906,79 @@ function GradcamPage() {
               transition={{ ...smoothTransition, delay: 0.25 }}
               className="flex w-full flex-col gap-6 rounded-[34px] border border-white/10 bg-white/5 p-8 backdrop-blur-2xl"
             >
+              <div className="rounded-[28px] border border-white/10 bg-black/45 p-5">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-lg font-semibold text-white/90">
+                      Model selector
+                    </h3>
+                    <p className="mt-1 text-xs text-white/60">
+                      Pick a network to regenerate Grad-CAM focus.
+                    </p>
+                  </div>
+                  <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.32em] text-white/60">
+                    Active · {activeModelLabel}
+                  </span>
+                </div>
+                <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                  {modelOptions.map((option) => {
+                    const isActive = option.id === activeModelId;
+                    return (
+                      <button
+                        key={option.id}
+                        type="button"
+                        onClick={() => handleModelChange(option.id)}
+                        className={`group relative flex h-full flex-col gap-3 rounded-3xl border px-5 py-4 text-left transition ${
+                          isActive
+                            ? "border-cyan-300/60 bg-[#081632]/95 shadow-[0_50px_110px_-70px_rgba(14,165,233,0.6)]"
+                            : "border-white/10 bg-white/5 hover:border-cyan-200/50 hover:bg-white/10"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-sm font-semibold text-white/85">
+                            {option.label}
+                          </span>
+                          <span
+                            className={`h-2 w-2 rounded-full transition ${
+                              isActive ? "bg-cyan-300" : "bg-white/30"
+                            }`}
+                          />
+                        </div>
+                        <p className="text-xs text-white/60">
+                          {option.tagline}
+                        </p>
+                        <div className="flex flex-wrap items-center gap-2 pt-1 text-[0.6rem] uppercase tracking-[0.28em]">
+                          {option.badges.map((badge) => (
+                            <span
+                              key={`${option.id}-${badge}`}
+                              className={`rounded-full border px-3 py-1 font-semibold transition ${
+                                isActive
+                                  ? "border-cyan-200/60 text-cyan-200"
+                                  : "border-white/12 text-white/50"
+                              }`}
+                            >
+                              {badge}
+                            </span>
+                          ))}
+                        </div>
+                        <span
+                          className={`block pt-1 text-[0.65rem] uppercase tracking-[0.28em] transition ${
+                            isActive ? "text-cyan-200" : "text-white/45"
+                          }`}
+                        >
+                          {option.footnote}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-semibold text-white/90 sm:text-2xl">
                   Model Prediction Graph
                 </h2>
                 <span className="rounded-full border border-white/10 bg-white/10 px-4 py-1 text-xs text-white/70">
-                  {modelLabel}
+                  {activeModelLabel}
                 </span>
               </div>
               <div className="rounded-[28px] border border-white/10 bg-black/40 p-6">

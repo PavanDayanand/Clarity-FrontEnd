@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+/* eslint-disable-next-line no-unused-vars */
 import { AnimatePresence, motion } from "framer-motion";
 import jsPDF from "jspdf";
+import { marked } from "marked";
 import { buttonDotClasses, primaryButtonClasses } from "../styles/ui.js";
 import { defaultDisease } from "../data/diseases.js";
 import { entryOverlayStyle, exitOverlayStyle } from "../styles/transitions.js";
@@ -24,6 +26,7 @@ import {
 const PLACEHOLDER_IMAGE = "/placeholder-xray.png";
 const DEFAULT_IMAGE_NAME = "clarity-upload";
 const DEFAULT_IMAGE_EXTENSION = "png";
+const A4_DIMENSIONS = { width: 794, height: 1123 };
 
 const getExtensionFromMime = (mimeType) => {
   if (!mimeType || typeof mimeType !== "string") {
@@ -63,46 +66,117 @@ const createFileFromBlob = (blob, nameHint) => {
   if (!blob) {
     return null;
   }
+
   const mimeType = blob.type || `image/${DEFAULT_IMAGE_EXTENSION}`;
   const fileName = ensureImageFileName(nameHint, mimeType);
-  if (blob instanceof File) {
+  const FileCtor =
+    typeof globalThis !== "undefined" ? globalThis.File : undefined;
+  const BlobCtor =
+    typeof globalThis !== "undefined" ? globalThis.Blob : undefined;
+
+  if (FileCtor && blob instanceof FileCtor) {
     if (!blob.name) {
-      return new File([blob], fileName, { type: mimeType });
+      return new FileCtor([blob], fileName, { type: mimeType });
     }
     return blob;
   }
-  return new File([blob], fileName, { type: mimeType });
+
+  if (FileCtor) {
+    try {
+      return new FileCtor([blob], fileName, { type: mimeType });
+    } catch (error) {
+      console.warn("Falling back while creating File from blob", error);
+      try {
+        const fallbackBlob =
+          BlobCtor && blob instanceof BlobCtor
+            ? blob
+            : BlobCtor
+            ? new BlobCtor([blob], { type: mimeType })
+            : blob;
+        return new FileCtor([fallbackBlob], fileName, { type: mimeType });
+      } catch (secondaryError) {
+        console.error("Unable to create File from blob", secondaryError);
+      }
+    }
+  }
+
+  if (BlobCtor) {
+    try {
+      const fallbackBlob =
+        blob instanceof BlobCtor
+          ? blob
+          : new BlobCtor([blob], { type: mimeType });
+      return Object.assign(fallbackBlob, {
+        name: fileName,
+        lastModified: Date.now(),
+      });
+    } catch (secondaryError) {
+      console.error("Unable to create File from blob", secondaryError);
+      return null;
+    }
+  }
+
+  return null;
 };
 
 const createFileFromDataUrl = (dataUrl, nameHint) => {
-  if (typeof dataUrl !== "string") {
+  if (
+    !dataUrl ||
+    typeof dataUrl !== "string" ||
+    !dataUrl.trim().startsWith("data:")
+  ) {
     return null;
   }
-  const match = dataUrl.match(/^data:(.+?);base64,(.*)$/);
-  if (!match) {
+
+  const matches = dataUrl.match(/^data:(image\/[\w.+-]+);base64,(.+)$/i);
+  if (!matches) {
     return null;
   }
-  const mimeType = match[1] || `image/${DEFAULT_IMAGE_EXTENSION}`;
-  const base64Payload = match[2] || "";
+  const mimeType = matches[1];
+  const base64Data = matches[2];
+
   try {
-    const binary = atob(base64Payload);
-    const length = binary.length;
+    let binaryString = "";
+    const rootScope = typeof globalThis !== "undefined" ? globalThis : {};
+    if (typeof rootScope.atob === "function") {
+      binaryString = rootScope.atob(base64Data);
+    } else if (rootScope.Buffer) {
+      binaryString = rootScope.Buffer.from(base64Data, "base64").toString(
+        "binary"
+      );
+    } else {
+      throw new Error("No base64 decoder available");
+    }
+
+    const length = binaryString.length;
     const bytes = new Uint8Array(length);
     for (let index = 0; index < length; index += 1) {
-      bytes[index] = binary.charCodeAt(index);
+      bytes[index] = binaryString.charCodeAt(index);
     }
-    return new File([bytes], ensureImageFileName(nameHint, mimeType), {
-      type: mimeType,
-    });
-  } catch {
+
+    const blob = new Blob([bytes], { type: mimeType });
+    return createFileFromBlob(blob, ensureImageFileName(nameHint, mimeType));
+  } catch (error) {
+    console.error("Failed to convert data URL to file", error);
     return null;
   }
 };
 
-const isRecoverableImageSource = (source) =>
-  typeof source === "string" &&
-  source.trim().length > 0 &&
-  !source.toLowerCase().includes("placeholder-xray");
+const isRecoverableImageSource = (value) => {
+  if (!value || typeof value !== "string") {
+    return false;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return false;
+  }
+  return (
+    /^data:image\//i.test(trimmed) ||
+    trimmed.startsWith("blob:") ||
+    /^https?:\/\//i.test(trimmed) ||
+    trimmed.startsWith("/")
+  );
+};
 
 const reportInfoCards = [
   {
@@ -122,86 +196,292 @@ const reportInfoCards = [
 const leftFeatureImage = encodeURI("/Gemini Generated Image.png");
 const rightFeatureImage = encodeURI("/Chest Blood Vessels MRA Scan.jpeg");
 
+const sanitizeHref = (href) => {
+  if (!href) {
+    return "#";
+  }
+
+  const trimmed = href.trim();
+  if (!trimmed) {
+    return "#";
+  }
+
+  if (/^(https?:|mailto:)/i.test(trimmed)) {
+    return trimmed;
+  }
+
+  if (trimmed.startsWith("/")) {
+    return trimmed;
+  }
+
+  return "#";
+};
+
+marked.use({
+  gfm: true,
+  breaks: false,
+  mangle: false,
+  headerIds: false,
+  renderer: {
+    link(href, title, text) {
+      const safeHref = sanitizeHref(href);
+      const titleAttr = title ? ` title="${title}"` : "";
+      return `<a href="${safeHref}"${titleAttr} target="_blank" rel="noreferrer noopener">${text}</a>`;
+    },
+  },
+});
+
+const stripHtmlTags = (html) =>
+  html.replace(/\s*<br\s*\/?>(\s|$)/gi, "\n").replace(/<[^>]+>/g, " ");
+
+const decodeHtmlEntities = (value) =>
+  value
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&#96;/g, "`");
+
+const normalizeWhitespace = (value) => value.replace(/\s+/g, " ").trim();
+
+const parseInlineMarkdown = (value) => {
+  const trimmed = typeof value === "string" ? value.trim() : "";
+  if (!trimmed) {
+    return { text: "", html: "" };
+  }
+
+  const html = marked.parseInline(trimmed).trim();
+  const text = normalizeWhitespace(decodeHtmlEntities(stripHtmlTags(html)));
+  return { text, html };
+};
+
 const parseReportContent = (content) => {
   if (!content) {
     return [];
   }
 
-  const lines = content.split(/\r?\n/);
+  const tokens = marked.lexer(content);
   const blocks = [];
-  let buffer = [];
-  let currentType = "paragraph";
+  let listBuffer = null;
 
-  const flush = () => {
-    if (!buffer.length) {
-      return;
-    }
-
-    if (currentType === "unordered" || currentType === "ordered") {
-      blocks.push({ type: currentType, items: buffer });
-    } else {
+  const commitList = () => {
+    if (listBuffer && listBuffer.items.length) {
       blocks.push({
-        type: "paragraph",
-        text: buffer.join(" "),
+        type: listBuffer.ordered ? "ordered" : "unordered",
+        items: listBuffer.items.map((item) => item.text),
+        itemsHtml: listBuffer.items.map((item) => item.html),
       });
     }
-
-    buffer = [];
-    currentType = "paragraph";
+    listBuffer = null;
   };
 
-  lines.forEach((line) => {
-    const trimmed = line.trim();
-
-    if (!trimmed) {
-      flush();
+  const pushListItem = (ordered, markdownText) => {
+    const inline = parseInlineMarkdown(markdownText);
+    if (!inline.text) {
       return;
     }
 
-    if (/^[A-Za-z][A-Za-z\s/]+:$/.test(trimmed)) {
-      flush();
-      blocks.push({ type: "heading", text: trimmed.replace(/:$/, "") });
-      return;
+    if (!listBuffer || listBuffer.ordered !== ordered) {
+      commitList();
+      listBuffer = { ordered, items: [] };
     }
 
-    const fieldMatch = trimmed.match(/^([A-Za-z][\w\s/]+):\s*(.+)$/);
-    if (fieldMatch && fieldMatch[2]) {
-      flush();
-      blocks.push({
-        type: "field",
-        label: fieldMatch[1].trim(),
-        value: fieldMatch[2].trim(),
-      });
-      return;
-    }
+    listBuffer.items.push(inline);
+  };
 
-    if (/^[*-]\s+/.test(trimmed)) {
-      if (currentType !== "unordered") {
-        flush();
-        currentType = "unordered";
+  tokens.forEach((token) => {
+    switch (token.type) {
+      case "space":
+        commitList();
+        break;
+      case "hr":
+        commitList();
+        blocks.push({ type: "separator" });
+        break;
+      case "heading": {
+        commitList();
+        const inline = parseInlineMarkdown(token.text);
+        if (inline.text) {
+          blocks.push({
+            type: "heading",
+            level: token.depth,
+            text: inline.text,
+            html: inline.html,
+          });
+        }
+        break;
       }
-      buffer.push(trimmed.replace(/^[*-]\s+/, "").trim());
-      return;
-    }
-
-    if (/^\d+\.\s+/.test(trimmed)) {
-      if (currentType !== "ordered") {
-        flush();
-        currentType = "ordered";
+      case "list": {
+        token.items.forEach((item) => {
+          if (item.task) {
+            const checkboxPrefix = item.checked ? "[x] " : "[ ] ";
+            pushListItem(
+              Boolean(token.ordered),
+              `${checkboxPrefix}${item.text}`
+            );
+          } else {
+            pushListItem(Boolean(token.ordered), item.text);
+          }
+        });
+        commitList();
+        break;
       }
-      buffer.push(trimmed.replace(/^\d+\.\s+/, "").trim());
-      return;
-    }
+      case "code": {
+        commitList();
+        const codeText =
+          typeof token.text === "string" ? token.text.trimEnd() : "";
+        if (codeText) {
+          blocks.push({
+            type: "code",
+            text: codeText,
+            lang: token.lang ?? null,
+          });
+        }
+        break;
+      }
+      case "blockquote": {
+        commitList();
+        const inline = parseInlineMarkdown(token.text);
+        if (inline.text) {
+          blocks.push({
+            type: "blockquote",
+            text: inline.text,
+            html: inline.html,
+          });
+        }
+        break;
+      }
+      case "paragraph":
+      case "text": {
+        commitList();
+        const raw = token.text ?? "";
 
-    if (currentType !== "paragraph") {
-      flush();
-      currentType = "paragraph";
+        const headingLike = raw.match(/^([A-Za-z][A-Za-z\s/]+):$/);
+        if (headingLike) {
+          const inline = parseInlineMarkdown(headingLike[1]);
+          if (inline.text) {
+            blocks.push({
+              type: "heading",
+              level: 3,
+              text: inline.text,
+              html: inline.html,
+            });
+          }
+          break;
+        }
+
+        const fieldMatch = raw.match(/^([A-Za-z][\w\s/]+):\s+(.+)$/);
+        if (fieldMatch) {
+          const label = normalizeWhitespace(fieldMatch[1]);
+          const value = parseInlineMarkdown(fieldMatch[2]);
+          blocks.push({
+            type: "field",
+            label,
+            value: value.text,
+            valueHtml: value.html,
+          });
+          break;
+        }
+
+        const inline = parseInlineMarkdown(raw);
+        if (inline.text) {
+          blocks.push({
+            type: "paragraph",
+            text: inline.text,
+            html: inline.html,
+          });
+        }
+        break;
+      }
+      default:
+        commitList();
+        break;
     }
-    buffer.push(trimmed);
   });
 
-  flush();
+  commitList();
   return blocks;
+};
+
+const inferImageFormat = (source) => {
+  if (!source) {
+    return "PNG";
+  }
+
+  const dataMatch = source.match(/^data:image\/(\w+);/i);
+  if (dataMatch?.[1]) {
+    return dataMatch[1].toUpperCase();
+  }
+
+  const lower = source.toLowerCase();
+  if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) {
+    return "JPEG";
+  }
+  if (lower.endsWith(".webp")) {
+    return "WEBP";
+  }
+  if (lower.endsWith(".bmp")) {
+    return "BMP";
+  }
+  return "PNG";
+};
+
+const fetchImageDataUrl = async (source) => {
+  if (!source) {
+    return null;
+  }
+
+  if (source.startsWith("data:")) {
+    return source;
+  }
+
+  try {
+    const response = await fetch(source, { cache: "force-cache" });
+    if (!response.ok) {
+      return null;
+    }
+    const blob = await response.blob();
+    return await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.onerror = () => reject(new Error("Unable to read image."));
+      reader.readAsDataURL(blob);
+    });
+  } catch (error) {
+    console.error("Failed to fetch report image", error);
+    return null;
+  }
+};
+
+const loadImageMetadata = async (source) => {
+  const dataUrl = await fetchImageDataUrl(source);
+  if (!dataUrl) {
+    return null;
+  }
+
+  return await new Promise((resolve) => {
+    const image = new Image();
+    image.onload = () => {
+      resolve({
+        dataUrl,
+        width: image.naturalWidth,
+        height: image.naturalHeight,
+      });
+    };
+    image.onerror = () => resolve({ dataUrl, width: 0, height: 0 });
+    image.src = dataUrl;
+  });
+};
+
+const buildFallbackReport = (fileName, findingName, confidencePercent) => {
+  const resolvedFinding = findingName || "Selected finding";
+  const resolvedConfidence = Number.isFinite(confidencePercent)
+    ? confidencePercent
+    : 0;
+  const friendlyFinding = resolvedFinding.toLowerCase();
+
+  return `Clarity AI Thoracic Report\n\nStudy: ${fileName}\nPrimary Finding: ${resolvedFinding}\nConfidence: ${resolvedConfidence}%\n\nHighlights:\n- Grad-CAM corroborates the focus regions consistent with ${friendlyFinding}.\n- No conflicting anomalies surfaced on bilateral comparison heuristics.\n- Recommend correlating with lab values and symptom onset to confirm diagnosis.\n\nRecommended Actions:\n1. Review Grad-CAM overlay for localisation context.\n2. Append attending commentary before finalising export.\n3. Dispatch PDF to PACS and notify MDT channel.`;
 };
 
 function ReportPage() {
@@ -268,19 +548,22 @@ function ReportPage() {
   const initialReport = locationState.report ?? uploadData.report ?? null;
   const initialPatientInfo =
     locationState.patientInfo ?? uploadData.patientInfo ?? null;
+  const initialReportContent =
+    typeof initialReport === "string" ? initialReport.trim() : "";
   const [typedText, setTypedText] = useState("");
   const [showPreview, setShowPreview] = useState(false);
   const [cursorVisible, setCursorVisible] = useState(true);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const pendingNavigation = useRef(null);
-  const hasShownDownloadPromptRef = useRef(false);
   const [reportData, setReportData] = useState(
-    initialReport ? { report: initialReport } : null
+    initialReportContent ? { report: initialReportContent } : null
   );
+  const [reportContent, setReportContent] = useState(initialReportContent);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState(null);
   const [apiError, setApiError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [generatedAt, setGeneratedAt] = useState(() => new Date());
-  const [showDownloadPrompt, setShowDownloadPrompt] = useState(false);
   const [patientInfo, setPatientInfo] = useState({
     name: initialPatientInfo?.name ?? "",
     age: initialPatientInfo?.age ? String(initialPatientInfo.age) : "",
@@ -306,6 +589,11 @@ function ReportPage() {
     [focusDiseaseName]
   );
   const findingName = disease?.name ?? "Selected finding";
+  const previewImageSource = effectiveHeatmap ?? originalImage;
+  const hasReportContent = Boolean(reportContent && reportContent.trim());
+  const isTypingReport = hasReportContent && !showPreview;
+  const isPreviewReady = hasReportContent && showPreview;
+  const canDownloadReport = isPreviewReady && !isDownloading;
 
   const genderLabel = useMemo(() => {
     const value = (patientInfo.gender ?? "").toString().trim();
@@ -347,18 +635,27 @@ function ReportPage() {
     }
   }, [generatedAt]);
 
-  const fallbackReport = useMemo(() => {
-    const lowerFinding = findingName.toLowerCase();
-    return `Clarity AI Thoracic Report\n\nStudy: ${fileName}\nPrimary Finding: ${findingName}\nConfidence: ${confidencePercent}%\n\nSummary:\n- Grad-CAM corroborates the focus regions consistent with ${lowerFinding}.\n- No conflicting anomalies surfaced on bilateral comparison heuristics.\n- Recommend correlating with lab values and symptom onset to confirm diagnosis.\n\nNext Steps:\n1. Review Grad-CAM overlay for localisation context.\n2. Append attending commentary before finalising export.\n3. Dispatch PDF to PACS and notify MDT channel.`;
-  }, [confidencePercent, fileName, findingName]);
-
-  const reportContent = useMemo(() => {
-    const generated = reportData?.report;
-    if (generated && typeof generated === "string" && generated.trim()) {
-      return generated;
+  const previewStatusMessage = useMemo(() => {
+    if (isLoading) {
+      return "Generating detailed findings…";
     }
-    return fallbackReport;
-  }, [fallbackReport, reportData?.report]);
+    if (isTypingReport) {
+      return "Composing the narrative…";
+    }
+    if (isPreviewReady) {
+      return `PDF preview ready • ${formattedGeneratedAt}`;
+    }
+    if (hasReportContent) {
+      return "Preparing preview…";
+    }
+    return "Generate a report to preview the PDF layout.";
+  }, [
+    formattedGeneratedAt,
+    hasReportContent,
+    isLoading,
+    isPreviewReady,
+    isTypingReport,
+  ]);
 
   const structuredReportBlocks = useMemo(
     () => parseReportContent(reportContent),
@@ -389,36 +686,40 @@ function ReportPage() {
         variant: "warning",
       });
       navigate("/", { replace: true });
-      return;
+    }
+  }, [file, navigate, showPopup]);
+
+  useEffect(() => {
+    if (!reportContent) {
+      setTypedText("");
+      setShowPreview(false);
+      setCursorVisible(true);
+      return undefined;
     }
 
     setTypedText("");
     setShowPreview(false);
     setCursorVisible(true);
-    setShowDownloadPrompt(false);
-    hasShownDownloadPromptRef.current = false;
-
-    if (!reportContent) {
-      return;
-    }
 
     let index = 0;
     const total = reportContent.length;
+    const content = reportContent;
+
     const typeInterval = setInterval(() => {
       index += 1;
-      setTypedText(reportContent.slice(0, index));
+      setTypedText(content.slice(0, index));
       if (index >= total) {
         clearInterval(typeInterval);
         setTimeout(() => {
           setShowPreview(true);
-        }, 900);
+        }, 600);
       }
     }, 14);
 
     return () => {
       clearInterval(typeInterval);
     };
-  }, [file, navigate, reportContent, showPopup]);
+  }, [reportContent]);
 
   useEffect(() => {
     if (showPreview) {
@@ -434,13 +735,6 @@ function ReportPage() {
       clearInterval(blinkInterval);
     };
   }, [showPreview]);
-
-  useEffect(() => {
-    if (showPreview && reportData && !hasShownDownloadPromptRef.current) {
-      hasShownDownloadPromptRef.current = true;
-      setShowDownloadPrompt(true);
-    }
-  }, [showPreview, reportData]);
 
   const triggerNavigation = (path) => {
     if (isTransitioning) {
@@ -480,6 +774,7 @@ function ReportPage() {
   const handlePatientInfoChange = (field) => (event) => {
     const value = event.target.value;
     setApiError(null);
+    setDownloadError(null);
     setPatientInfo((prev) => ({
       ...prev,
       [field]: value,
@@ -581,8 +876,7 @@ function ReportPage() {
     setShowPreview(false);
     setTypedText("");
     setReportData(null);
-    setShowDownloadPrompt(false);
-    hasShownDownloadPromptRef.current = false;
+    setReportContent("");
 
     try {
       const response = await generateReport(
@@ -597,8 +891,6 @@ function ReportPage() {
       if (response?.success === false) {
         throw new Error(response?.message ?? "Report generation failed.");
       }
-      setReportData(response);
-
       let resolvedPatientInfo = basePatientInfo;
 
       if (response?.patient_info) {
@@ -639,24 +931,41 @@ function ReportPage() {
       const summary = getTopFindings(positive, response?.predictions);
       setPredictionSummary(summary);
 
-      const derivedFocus =
+      const nextFocusDisease =
         summary[0]?.disease ?? response?.top_disease ?? focusDiseaseName;
-      setFocusDiseaseName(derivedFocus);
+      setFocusDiseaseName(nextFocusDisease);
+
+      const nextDiseaseRecord = nextFocusDisease
+        ? findDiseaseByName(nextFocusDisease)
+        : disease;
+      const nextDiseaseName =
+        nextDiseaseRecord?.name ?? findingName ?? "Selected finding";
 
       const derivedConfidenceRaw =
         response?.confidence ?? summary[0]?.probability ?? confidenceScore;
-      const derivedConfidence =
+      const nextConfidenceScore =
         typeof derivedConfidenceRaw === "number"
           ? derivedConfidenceRaw
           : typeof derivedConfidenceRaw === "string"
           ? Number(derivedConfidenceRaw)
-          : null;
-      if (
-        typeof derivedConfidence === "number" &&
-        !Number.isNaN(derivedConfidence)
-      ) {
-        setConfidenceScore(derivedConfidence);
+          : confidenceScore;
+      const normalizedConfidenceScore = Number.isFinite(nextConfidenceScore)
+        ? nextConfidenceScore
+        : confidenceScore;
+      if (Number.isFinite(normalizedConfidenceScore)) {
+        setConfidenceScore(normalizedConfidenceScore);
       }
+      const nextConfidencePercent = Math.round(
+        Math.min(Math.max(normalizedConfidenceScore ?? 0, 0), 1) * 100
+      );
+
+      const incomingReport = (response?.report ?? "").trim();
+      const resolvedReportText = incomingReport
+        ? incomingReport
+        : buildFallbackReport(fileName, nextDiseaseName, nextConfidencePercent);
+
+      setReportData({ ...response, report: resolvedReportText });
+      setReportContent(resolvedReportText);
 
       const responseModelKey = resolveModelKey(
         response?.model_used ?? modelKey
@@ -681,19 +990,17 @@ function ReportPage() {
         originalImage: nextOriginalImage,
         previewUrl: nextPreviewUrl,
         heatmapImage: effectiveHeatmap,
-        disease: derivedFocus
-          ? findDiseaseByName(derivedFocus) ?? initialDisease
+        disease: nextFocusDisease
+          ? findDiseaseByName(nextFocusDisease) ?? initialDisease
           : initialDisease,
-        confidence:
-          typeof derivedConfidence === "number" &&
-          !Number.isNaN(derivedConfidence)
-            ? derivedConfidence
-            : confidenceScore,
+        confidence: Number.isFinite(normalizedConfidenceScore)
+          ? normalizedConfidenceScore
+          : confidenceScore,
         predictions: response?.predictions ?? initialPredictions ?? null,
         positiveFindings: positive,
         predictionSummary: summary,
-        topFinding: derivedFocus,
-        report: response?.report ?? reportContent,
+        topFinding: nextFocusDisease,
+        report: resolvedReportText,
         patientInfo: resolvedPatientInfo,
         modelKey: responseModelKey,
         modelDisplayName: responseModelLabel,
@@ -718,130 +1025,202 @@ function ReportPage() {
     }
   };
 
-  const handleDownload = () => {
-    const doc = new jsPDF({
-      orientation: "portrait",
-      unit: "pt",
-      format: "a4",
-    });
-    const margin = 64;
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-    let cursorY = margin;
+  const handleDownload = async () => {
+    if (!reportContent?.trim()) {
+      setDownloadError("Generate a report before downloading.");
+      return;
+    }
 
-    const lineHeight = (size) => size * 1.35;
-    const ensureSpace = (height = 0) => {
-      if (cursorY + height > pageHeight - margin) {
-        doc.addPage();
-        cursorY = margin;
-      }
-    };
+    setIsDownloading(true);
+    setDownloadError(null);
 
-    const writeTextBlock = (text, size = 12, weight = "normal", gap = 18) => {
-      doc.setFont("helvetica", weight);
-      doc.setFontSize(size);
-      const lines = doc.splitTextToSize(text, pageWidth - margin * 2);
-      const blockHeight = lines.length * lineHeight(size);
-      ensureSpace(blockHeight);
-      doc.text(lines, margin, cursorY);
-      cursorY += blockHeight + gap;
-    };
-
-    const writeField = (label, value) => {
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(11);
-      const labelText = `${label}:`;
-      const labelWidth = doc.getTextWidth(labelText);
-      ensureSpace(lineHeight(11));
-      doc.text(labelText, margin, cursorY);
-      doc.setFont("helvetica", "normal");
-      const valueLines = doc.splitTextToSize(
-        value,
-        pageWidth - margin * 2 - labelWidth - 12
-      );
-      doc.text(valueLines, margin + labelWidth + 12, cursorY);
-      cursorY += valueLines.length * lineHeight(11) + 14;
-    };
-
-    const writeList = (items, ordered = false) => {
-      if (!items?.length) {
-        return;
-      }
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(11);
-      items.forEach((item, index) => {
-        const prefix = ordered ? `${index + 1}.` : "•";
-        const prefixWidth = doc.getTextWidth(prefix);
-        const availableWidth = pageWidth - margin * 2 - prefixWidth - 12;
-        const valueLines = doc.splitTextToSize(item, availableWidth);
-        const blockHeight = valueLines.length * lineHeight(11);
-        ensureSpace(blockHeight);
-        doc.text(prefix, margin, cursorY);
-        doc.text(valueLines, margin + prefixWidth + 12, cursorY);
-        cursorY += blockHeight + 10;
+    try {
+      const doc = new jsPDF({
+        orientation: "portrait",
+        unit: "pt",
+        format: "a4",
       });
-      cursorY += 6;
-    };
+      const margin = 64;
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      let cursorY = margin;
 
-    doc.setTextColor(30, 41, 59);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(22);
-    doc.text("Clarity Imaging", margin, cursorY);
-    cursorY += 28;
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(12);
-    doc.text("Thoracic AI Diagnostic Brief", margin, cursorY);
-    const timestampWidth = doc.getTextWidth(formattedGeneratedAt);
-    doc.text(
-      formattedGeneratedAt,
-      pageWidth - margin - timestampWidth,
-      cursorY
-    );
-    cursorY += 18;
-    doc.setDrawColor(203, 213, 225);
-    doc.setLineWidth(0.8);
-    doc.line(margin, cursorY, pageWidth - margin, cursorY);
-    cursorY += 24;
+      const lineHeight = (size) => size * 1.35;
+      const ensureSpace = (height = 0) => {
+        if (cursorY + height > pageHeight - margin) {
+          doc.addPage();
+          cursorY = margin;
+        }
+      };
 
-    writeField("Study", fileName);
-    writeField(
-      "Primary Finding",
-      `${findingName} · ${confidencePercent}% confidence`
-    );
-    writeField(
-      "Patient",
-      [
-        patientInfo.name || "Name pending",
-        patientInfo.age ? `${patientInfo.age} years` : "Age pending",
-        genderLabel || "Gender pending",
-        patientInfo.patient_id ? `ID ${patientInfo.patient_id}` : null,
-        patientInfo.email || null,
-      ]
-        .filter(Boolean)
-        .join(" · ")
-    );
+      const writeTextBlock = (text, size = 12, weight = "normal", gap = 18) => {
+        doc.setFont("helvetica", weight);
+        doc.setFontSize(size);
+        const lines = doc.splitTextToSize(text, pageWidth - margin * 2);
+        const blockHeight = lines.length * lineHeight(size);
+        ensureSpace(blockHeight);
+        doc.text(lines, margin, cursorY);
+        cursorY += blockHeight + gap;
+      };
 
-    narrativeBlocks.forEach((block) => {
-      switch (block.type) {
-        case "heading":
-          writeTextBlock(block.text, 12, "bold", 10);
-          break;
-        case "field":
-          writeField(block.label, block.value);
-          break;
-        case "unordered":
-          writeList(block.items, false);
-          break;
-        case "ordered":
-          writeList(block.items, true);
-          break;
-        default:
-          writeTextBlock(block.text, 11, "normal", 16);
+      const writeField = (label, value) => {
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(11);
+        const labelText = `${label}:`;
+        const labelWidth = doc.getTextWidth(labelText);
+        ensureSpace(lineHeight(11));
+        doc.text(labelText, margin, cursorY);
+        doc.setFont("helvetica", "normal");
+        const valueLines = doc.splitTextToSize(
+          value,
+          pageWidth - margin * 2 - labelWidth - 12
+        );
+        doc.text(valueLines, margin + labelWidth + 12, cursorY);
+        cursorY += valueLines.length * lineHeight(11) + 14;
+      };
+
+      const writeList = (items, ordered = false) => {
+        if (!items?.length) {
+          return;
+        }
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(11);
+        items.forEach((item, index) => {
+          const prefix = ordered ? `${index + 1}.` : "•";
+          const prefixWidth = doc.getTextWidth(prefix);
+          const availableWidth = pageWidth - margin * 2 - prefixWidth - 12;
+          const valueLines = doc.splitTextToSize(item, availableWidth);
+          const blockHeight = valueLines.length * lineHeight(11);
+          ensureSpace(blockHeight);
+          doc.text(prefix, margin, cursorY);
+          doc.text(valueLines, margin + prefixWidth + 12, cursorY);
+          cursorY += blockHeight + 10;
+        });
+        cursorY += 6;
+      };
+
+      doc.setTextColor(30, 41, 59);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(22);
+      doc.text("Clarity Imaging", margin, cursorY);
+      cursorY += 28;
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(12);
+      doc.text("Thoracic AI Diagnostic Brief", margin, cursorY);
+      const timestampWidth = doc.getTextWidth(formattedGeneratedAt);
+      doc.text(
+        formattedGeneratedAt,
+        pageWidth - margin - timestampWidth,
+        cursorY
+      );
+      cursorY += 18;
+      doc.setDrawColor(203, 213, 225);
+      doc.setLineWidth(0.8);
+      doc.line(margin, cursorY, pageWidth - margin, cursorY);
+      cursorY += 24;
+
+      writeField("Study", fileName);
+      writeField(
+        "Primary Finding",
+        `${findingName} · ${confidencePercent}% confidence`
+      );
+      writeField(
+        "Patient",
+        [
+          patientInfo.name || "Name pending",
+          patientInfo.age ? `${patientInfo.age} years` : "Age pending",
+          genderLabel || "Gender pending",
+          patientInfo.patient_id ? `ID ${patientInfo.patient_id}` : null,
+          patientInfo.email || null,
+        ]
+          .filter(Boolean)
+          .join(" · ")
+      );
+
+      const includeImage =
+        previewImageSource && isRecoverableImageSource(previewImageSource);
+      const imageCaption =
+        includeImage && heatmapMethod
+          ? `Uploaded imaging study • ${heatmapMethod}`
+          : "Uploaded imaging study";
+      const imageMetadata = includeImage
+        ? await loadImageMetadata(previewImageSource)
+        : null;
+
+      if (imageMetadata?.dataUrl) {
+        const availableWidth = pageWidth - margin * 2;
+        const availableHeight = pageHeight * 0.32;
+        const aspectRatio =
+          imageMetadata.width && imageMetadata.height
+            ? imageMetadata.width / imageMetadata.height
+            : A4_DIMENSIONS.width / A4_DIMENSIONS.height;
+        let renderWidth = availableWidth;
+        let renderHeight = renderWidth / aspectRatio;
+        if (renderHeight > availableHeight) {
+          renderHeight = availableHeight;
+          renderWidth = renderHeight * aspectRatio;
+        }
+        const imageFormat = inferImageFormat(imageMetadata.dataUrl);
+        ensureSpace(renderHeight + 28);
+        try {
+          doc.addImage(
+            imageMetadata.dataUrl,
+            imageFormat,
+            margin,
+            cursorY,
+            renderWidth,
+            renderHeight,
+            undefined,
+            "FAST"
+          );
+          cursorY += renderHeight + 16;
+          doc.setFont("helvetica", "italic");
+          doc.setFontSize(10);
+          doc.setTextColor(71, 85, 105);
+          doc.text(imageCaption, margin, cursorY);
+          cursorY += 18;
+          doc.setTextColor(30, 41, 59);
+        } catch (imageError) {
+          console.warn("Failed to embed report image", imageError);
+        }
       }
-    });
 
-    doc.save("clarity-report.pdf");
-    setShowDownloadPrompt(false);
+      narrativeBlocks.forEach((block) => {
+        switch (block.type) {
+          case "heading":
+            writeTextBlock(block.text, 12, "bold", 10);
+            break;
+          case "field":
+            writeField(block.label, block.value);
+            break;
+          case "unordered":
+            writeList(block.items, false);
+            break;
+          case "ordered":
+            writeList(block.items, true);
+            break;
+          default:
+            writeTextBlock(block.text, 11, "normal", 16);
+        }
+      });
+
+      doc.save("clarity-report.pdf");
+      showPopup({
+        title: "Download ready",
+        message: "Your Clarity PDF has been saved to device storage.",
+        variant: "success",
+      });
+    } catch (error) {
+      console.error("Report download failed", error);
+      setDownloadError("Unable to download the report. Please try again.");
+      showPopup({
+        title: "Download failed",
+        message: "Unable to download the report. Please try again.",
+        variant: "danger",
+      });
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
   return (
@@ -1142,6 +1521,76 @@ function ReportPage() {
                   <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.22),transparent_65%)]" />
                   <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom,rgba(14,116,233,0.18),transparent_65%)]" />
                 </div>
+                <div className="relative z-20 mb-6 flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-sm text-white/70">
+                    {previewStatusMessage}
+                  </p>
+                  <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-3">
+                    {downloadError ? (
+                      <span className="text-xs font-semibold text-rose-300">
+                        {downloadError}
+                      </span>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={handleDownload}
+                      disabled={!canDownloadReport}
+                      aria-disabled={!canDownloadReport}
+                      aria-busy={isDownloading}
+                      className={`inline-flex items-center gap-2 rounded-full border border-white/14 px-4 py-2 text-sm font-semibold transition ${
+                        canDownloadReport
+                          ? "bg-white/12 text-white hover:bg-white/16 focus:outline-none focus:ring-2 focus:ring-cyan-300/50"
+                          : "cursor-not-allowed bg-white/6 text-white/45"
+                      }`}
+                    >
+                      {isDownloading ? (
+                        <svg
+                          className="h-4 w-4 animate-spin text-cyan-200"
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="9"
+                            stroke="currentColor"
+                            strokeWidth="3"
+                          />
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M12 3a9 9 0 018.94 8.06 1.2 1.2 0 01-1.18 1.34c-.62 0-1.13-.46-1.19-1.08A6.8 6.8 0 0012 5.2V3z"
+                          />
+                        </svg>
+                      ) : (
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.6"
+                          className="h-4 w-4"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M12 4v12m0 0 4-4m-4 4-4-4"
+                          />
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M6 20h12"
+                          />
+                        </svg>
+                      )}
+                      <span>
+                        {isDownloading ? "Preparing" : "Download PDF"}
+                      </span>
+                    </button>
+                  </div>
+                </div>
                 <AnimatePresence mode="wait">
                   {!showPreview ? (
                     <motion.div
@@ -1150,30 +1599,38 @@ function ReportPage() {
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -18, scale: 0.97 }}
                       transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-                      className="relative z-10 mx-auto w-full max-w-4xl"
+                      className="relative z-10 mx-auto w-full"
                     >
-                      <div className="overflow-hidden rounded-[36px] border border-white/12 bg-[#f8fafc] text-slate-800 shadow-[0_38px_85px_-48px_rgba(56,189,248,0.6)]">
-                        <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200/80 bg-white/80 px-10 py-8">
-                          <div>
-                            <span className="text-xs font-semibold uppercase tracking-[0.32em] text-slate-500">
-                              Clarity Imaging
-                            </span>
-                            <h3 className="mt-2 text-2xl font-semibold text-slate-900">
-                              Thoracic AI Brief
-                            </h3>
-                            <p className="mt-1 text-sm text-slate-500">
-                              {fileName}
-                            </p>
+                      <div
+                        className="relative mx-auto overflow-hidden rounded-[36px] border border-white/12 bg-[#f8fafc] text-slate-800 shadow-[0_38px_85px_-48px_rgba(56,189,248,0.6)]"
+                        style={{
+                          width: "100%",
+                          maxWidth: `${A4_DIMENSIONS.width}px`,
+                          aspectRatio: `${A4_DIMENSIONS.width} / ${A4_DIMENSIONS.height}`,
+                          maxHeight: "80vh",
+                        }}
+                      >
+                        <div className="absolute inset-0 flex flex-col overflow-hidden">
+                          <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200/80 bg-white/85 px-10 py-8">
+                            <div>
+                              <span className="text-xs font-semibold uppercase tracking-[0.32em] text-slate-500">
+                                Clarity Imaging
+                              </span>
+                              <h3 className="mt-2 text-2xl font-semibold text-slate-900">
+                                Thoracic AI Brief
+                              </h3>
+                              <p className="mt-1 text-sm text-slate-500">
+                                {fileName}
+                              </p>
+                            </div>
+                            <div className="text-right text-xs text-slate-500">
+                              <p>{formattedGeneratedAt}</p>
+                              <p className="mt-1 uppercase tracking-[0.28em]">
+                                Drafting
+                              </p>
+                            </div>
                           </div>
-                          <div className="text-right text-xs text-slate-500">
-                            <p>{formattedGeneratedAt}</p>
-                            <p className="mt-1 uppercase tracking-[0.28em]">
-                              Drafting
-                            </p>
-                          </div>
-                        </div>
-                        <div className="px-10 py-12">
-                          <div className="space-y-6 font-sans text-[15px] leading-7 text-slate-700">
+                          <div className="flex-1 overflow-y-auto px-10 py-12">
                             <pre className="whitespace-pre-wrap font-sans text-[15px] leading-7 text-slate-700">
                               {typedText}
                               {!showPreview ? (
@@ -1196,139 +1653,190 @@ function ReportPage() {
                       initial={{ opacity: 0, scale: 0.97 }}
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-                      className="relative z-10 mx-auto w-full max-w-4xl"
+                      className="relative z-10 mx-auto w-full"
                     >
-                      <div className="overflow-hidden rounded-[36px] border border-white/12 bg-white text-slate-800 shadow-[0_45px_120px_-60px_rgba(59,130,246,0.65)]">
-                        <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200/80 bg-slate-50 px-10 py-8">
-                          <div>
-                            <span className="text-xs font-semibold uppercase tracking-[0.32em] text-slate-500">
-                              Clarity Imaging
-                            </span>
-                            <h3 className="mt-2 text-2xl font-semibold text-slate-900">
-                              Thoracic Report
-                            </h3>
-                            <p className="mt-1 text-sm text-slate-500">
-                              Generated {formattedGeneratedAt}
-                            </p>
-                          </div>
-                          <div className="text-right text-xs text-slate-500">
-                            <p>{fileName}</p>
-                            <p className="mt-1 uppercase tracking-[0.28em] text-slate-400">
-                              Confidence {confidencePercent}%
-                            </p>
-                          </div>
-                        </div>
-                        <div className="px-10 py-12">
-                          <div className="grid gap-6 text-[15px] leading-7">
-                            <div className="rounded-2xl bg-slate-100/70 px-6 py-5">
-                              <h4 className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
-                                Study
-                              </h4>
-                              <p className="mt-2 text-slate-800">{fileName}</p>
-                            </div>
-                            <div className="grid gap-4 rounded-2xl bg-slate-100/60 px-6 py-5 sm:grid-cols-2">
-                              <div>
-                                <h4 className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
-                                  Patient
-                                </h4>
-                                <p className="mt-2 text-slate-800">
-                                  {patientInfo.name || "Name pending"}
-                                </p>
-                                <p className="text-sm text-slate-600">
-                                  {patientInfo.age
-                                    ? `${patientInfo.age} years`
-                                    : "Age pending"}
-                                </p>
-                              </div>
-                              <div>
-                                <h4 className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
-                                  Profile
-                                </h4>
-                                <ul className="mt-2 space-y-1 text-slate-700">
-                                  <li>{genderLabel || "Gender pending"}</li>
-                                  {patientInfo.patient_id ? (
-                                    <li>ID {patientInfo.patient_id}</li>
-                                  ) : null}
-                                  {patientInfo.email ? (
-                                    <li>{patientInfo.email}</li>
-                                  ) : null}
-                                </ul>
-                              </div>
-                            </div>
-                            <div className="rounded-2xl bg-slate-100/70 px-6 py-5">
-                              <h4 className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
-                                Primary finding
-                              </h4>
-                              <p className="mt-2 font-semibold text-slate-900">
-                                {findingName} · {confidencePercent}% confidence
+                      <div
+                        className="relative mx-auto overflow-hidden rounded-[36px] border border-white/12 bg-white text-slate-800 shadow-[0_45px_120px_-60px_rgba(59,130,246,0.65)]"
+                        style={{
+                          width: "100%",
+                          maxWidth: `${A4_DIMENSIONS.width}px`,
+                          aspectRatio: `${A4_DIMENSIONS.width} / ${A4_DIMENSIONS.height}`,
+                          maxHeight: "80vh",
+                        }}
+                      >
+                        <div className="absolute inset-0 flex flex-col overflow-hidden">
+                          <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200/80 bg-slate-50/90 px-10 py-8">
+                            <div>
+                              <span className="text-xs font-semibold uppercase tracking-[0.32em] text-slate-500">
+                                Clarity Imaging
+                              </span>
+                              <h3 className="mt-2 text-2xl font-semibold text-slate-900">
+                                Thoracic Report
+                              </h3>
+                              <p className="mt-1 text-sm text-slate-500">
+                                Generated {formattedGeneratedAt}
                               </p>
                             </div>
-                            <div className="space-y-5 rounded-2xl border border-slate-200/70 px-6 py-6">
-                              {narrativeBlocks.map((block, index) => {
-                                if (block.type === "heading") {
-                                  return (
-                                    <h4
-                                      key={`heading-${index}`}
-                                      className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-500"
-                                    >
-                                      {block.text}
-                                    </h4>
-                                  );
-                                }
-                                if (block.type === "field") {
-                                  return (
-                                    <div
-                                      key={`field-${block.label}-${index}`}
-                                      className="text-sm text-slate-700"
-                                    >
-                                      <span className="font-semibold text-slate-600">
-                                        {block.label}:&nbsp;
-                                      </span>
-                                      {block.value}
-                                    </div>
-                                  );
-                                }
-                                if (block.type === "unordered") {
-                                  return (
-                                    <ul
-                                      key={`unordered-${index}`}
-                                      className="list-disc space-y-2 pl-6 text-sm text-slate-700"
-                                    >
-                                      {block.items.map((item, itemIndex) => (
-                                        <li
-                                          key={`unordered-${index}-${itemIndex}`}
-                                        >
-                                          {item}
-                                        </li>
-                                      ))}
-                                    </ul>
-                                  );
-                                }
-                                if (block.type === "ordered") {
-                                  return (
-                                    <ol
-                                      key={`ordered-${index}`}
-                                      className="list-decimal space-y-2 pl-6 text-sm text-slate-700"
-                                    >
-                                      {block.items.map((item, itemIndex) => (
-                                        <li
-                                          key={`ordered-${index}-${itemIndex}`}
-                                        >
-                                          {item}
-                                        </li>
-                                      ))}
-                                    </ol>
-                                  );
-                                }
-                                return (
-                                  <p
-                                    key={`paragraph-${index}`}
-                                    className="text-sm text-slate-700"
-                                  >
-                                    {block.text}
+                            <div className="text-right text-xs text-slate-500">
+                              <p>{fileName}</p>
+                              <p className="mt-1 uppercase tracking-[0.28em] text-slate-400">
+                                Confidence {confidencePercent}%
+                              </p>
+                              <p className="mt-1 text-slate-400">
+                                {modelLabel}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex-1 overflow-y-auto px-10 py-10">
+                            <div className="grid gap-6 text-[15px] leading-7">
+                              <div className="grid gap-4 sm:grid-cols-2">
+                                <article className="rounded-2xl bg-slate-100/70 px-6 py-5">
+                                  <h4 className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
+                                    Study
+                                  </h4>
+                                  <p className="mt-2 text-slate-800">
+                                    {fileName}
                                   </p>
-                                );
-                              })}
+                                  <p className="text-sm text-slate-500">
+                                    Generated {formattedGeneratedAt}
+                                  </p>
+                                </article>
+                                <article className="rounded-2xl bg-slate-100/70 px-6 py-5">
+                                  <h4 className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
+                                    Primary finding
+                                  </h4>
+                                  <p className="mt-2 font-semibold text-slate-900">
+                                    {findingName}
+                                  </p>
+                                  <p className="text-sm text-slate-600">
+                                    {confidencePercent}% confidence ·{" "}
+                                    {modelLabel}
+                                  </p>
+                                </article>
+                                <article className="rounded-2xl bg-slate-100/60 px-6 py-5 sm:col-span-2">
+                                  <h4 className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
+                                    Patient overview
+                                  </h4>
+                                  <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm text-slate-700">
+                                    <span>
+                                      {patientInfo.name || "Name pending"}
+                                    </span>
+                                    <span>
+                                      {patientInfo.age
+                                        ? `${patientInfo.age} years`
+                                        : "Age pending"}
+                                    </span>
+                                    <span>
+                                      {genderLabel || "Gender pending"}
+                                    </span>
+                                    {patientInfo.patient_id ? (
+                                      <span>ID {patientInfo.patient_id}</span>
+                                    ) : null}
+                                    {patientInfo.email ? (
+                                      <span>{patientInfo.email}</span>
+                                    ) : null}
+                                  </div>
+                                </article>
+                              </div>
+
+                              {previewImageSource ? (
+                                <figure className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-5">
+                                  <div className="overflow-hidden rounded-2xl border border-slate-200/60 bg-slate-900/10">
+                                    <img
+                                      src={previewImageSource}
+                                      alt="Uploaded imaging study"
+                                      className="h-auto w-full object-contain"
+                                      style={{ maxHeight: "320px" }}
+                                    />
+                                  </div>
+                                  <figcaption className="mt-3 text-xs text-slate-500">
+                                    Uploaded imaging study · {fileName}
+                                    {heatmapMethod ? ` • ${heatmapMethod}` : ""}
+                                    {heatmapTopDisease
+                                      ? ` • ${heatmapTopDisease}`
+                                      : ""}
+                                  </figcaption>
+                                </figure>
+                              ) : null}
+
+                              <div className="space-y-5 rounded-2xl border border-slate-200/70 px-6 py-6">
+                                {narrativeBlocks.length ? (
+                                  narrativeBlocks.map((block, index) => {
+                                    if (block.type === "heading") {
+                                      return (
+                                        <h4
+                                          key={`heading-${index}`}
+                                          className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-500"
+                                        >
+                                          {block.text}
+                                        </h4>
+                                      );
+                                    }
+                                    if (block.type === "field") {
+                                      return (
+                                        <div
+                                          key={`field-${block.label}-${index}`}
+                                          className="text-sm text-slate-700"
+                                        >
+                                          <span className="font-semibold text-slate-600">
+                                            {block.label}:&nbsp;
+                                          </span>
+                                          {block.value}
+                                        </div>
+                                      );
+                                    }
+                                    if (block.type === "unordered") {
+                                      return (
+                                        <ul
+                                          key={`unordered-${index}`}
+                                          className="list-disc space-y-2 pl-6 text-sm text-slate-700"
+                                        >
+                                          {block.items.map(
+                                            (item, itemIndex) => (
+                                              <li
+                                                key={`unordered-${index}-${itemIndex}`}
+                                              >
+                                                {item}
+                                              </li>
+                                            )
+                                          )}
+                                        </ul>
+                                      );
+                                    }
+                                    if (block.type === "ordered") {
+                                      return (
+                                        <ol
+                                          key={`ordered-${index}`}
+                                          className="list-decimal space-y-2 pl-6 text-sm text-slate-700"
+                                        >
+                                          {block.items.map(
+                                            (item, itemIndex) => (
+                                              <li
+                                                key={`ordered-${index}-${itemIndex}`}
+                                              >
+                                                {item}
+                                              </li>
+                                            )
+                                          )}
+                                        </ol>
+                                      );
+                                    }
+                                    return (
+                                      <p
+                                        key={`paragraph-${index}`}
+                                        className="text-sm text-slate-700"
+                                      >
+                                        {block.text}
+                                      </p>
+                                    );
+                                  })
+                                ) : (
+                                  <p className="text-sm text-slate-500">
+                                    Narrative content will appear once the AI
+                                    report is generated.
+                                  </p>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -1350,7 +1858,7 @@ function ReportPage() {
                   Report Snapshot
                 </h2>
                 <span className="rounded-full border border-white/12 bg-white/10 px-4 py-1 text-xs font-semibold uppercase tracking-[0.32em] text-white/65">
-                  Ready to export
+                  {isPreviewReady ? "Ready to export" : "Awaiting report"}
                 </span>
               </div>
               <div className="grid gap-6 text-sm text-white/70 sm:grid-cols-2 sm:text-base">
@@ -1503,97 +2011,6 @@ function ReportPage() {
       >
         <Footer />
       </motion.div>
-
-      <AnimatePresence>
-        {showDownloadPrompt ? (
-          <motion.div
-            key="download-dialog"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-            className="fixed inset-0 z-40 flex items-center justify-center bg-[#020617]/85 backdrop-blur-xl"
-            onClick={() => setShowDownloadPrompt(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.94, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.96, opacity: 0 }}
-              transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-              className="w-[min(520px,92vw)] rounded-3xl border border-white/12 bg-[#08132c]/95 p-8 text-white shadow-[0_40px_120px_-45px_rgba(59,130,246,0.7)]"
-              onClick={(event) => event.stopPropagation()}
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-semibold text-white">
-                    Report ready to download
-                  </h3>
-                  <p className="mt-2 text-sm text-white/70">
-                    The latest Clarity brief for {fileName} is prepared in an A4
-                    layout. Download to share or archive immediately.
-                  </p>
-                </div>
-                <span className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white/70">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    className="h-5 w-5"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M12 5v9m0 0 3-3m-3 3-3-3"
-                    />
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M6 19h12"
-                    />
-                  </svg>
-                </span>
-              </div>
-              <div className="mt-6 flex flex-wrap items-center justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setShowDownloadPrompt(false)}
-                  className="rounded-full border border-white/12 bg-white/8 px-4 py-2 text-sm font-semibold text-white/70 transition hover:bg-white/12 hover:text-white"
-                >
-                  Later
-                </button>
-                <button
-                  type="button"
-                  onClick={handleDownload}
-                  className="inline-flex items-center gap-2 rounded-full bg-[#2563eb] px-5 py-2 text-sm font-semibold text-white shadow-[0_18px_50px_-28px_rgba(37,99,235,0.85)] transition hover:bg-[#1d4ed8]"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    className="h-4 w-4"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M12 4v12m0 0 4-4m-4 4-4-4"
-                    />
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M6 20h12"
-                    />
-                  </svg>
-                  Download report
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
     </div>
   );
 }
