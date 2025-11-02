@@ -9,6 +9,7 @@ import PrimaryNav from "../components/PrimaryNav.jsx";
 import Footer from "../components/Footer.jsx";
 import ScrollIndicator from "../components/ui/ScrollIndicator.jsx";
 import BackgroundGrid from "../components/ui/BackgroundGrid.jsx";
+import PageBackdrop from "../components/ui/PageBackdrop.jsx";
 import { usePopup } from "../components/ui/PopupProvider.jsx";
 import {
   generateHeatmap,
@@ -403,18 +404,7 @@ function GradcamPage() {
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#031029] text-white">
       <ScrollIndicator />
-      <div className="pointer-events-none absolute inset-0 opacity-90">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(132,54,255,0.45),rgba(3,10,28,0.98))]" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom,rgba(8,22,47,0.95),#020713)]" />
-        <div
-          className="absolute -top-40 -left-28 rounded-full bg-linear-to-br from-[#321d8f]/70 via-[#5c3ad7]/60 to-transparent blur-3xl opacity-70"
-          style={{ width: "30rem", height: "30rem" }}
-        />
-        <div
-          className="absolute bottom-0 -right-48 rounded-full bg-linear-to-tl from-[#0b1a4a]/80 via-[#1e2d6d]/65 to-transparent blur-3xl opacity-90"
-          style={{ width: "42rem", height: "42rem" }}
-        />
-      </div>
+      <PageBackdrop variant="gradcam" />
       <BackgroundGrid className="z-10 opacity-50" />
 
       <motion.div

@@ -14,6 +14,7 @@ import PrimaryNav from "../components/PrimaryNav.jsx";
 import Footer from "../components/Footer.jsx";
 import ScrollIndicator from "../components/ui/ScrollIndicator.jsx";
 import BackgroundGrid from "../components/ui/BackgroundGrid.jsx";
+import PageBackdrop from "../components/ui/PageBackdrop.jsx";
 import { usePopup } from "../components/ui/PopupProvider.jsx";
 import { predictDisease } from "../api/clarityApi.js";
 import { findDiseaseByName, getTopFindings } from "../utils/diseaseLookup.js";
@@ -1070,18 +1071,7 @@ function PredictPage() {
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#031029] text-white">
       <ScrollIndicator className="right-3 sm:right-4 md:right-8 lg:right-12" />
-      <div className="pointer-events-none absolute inset-0 opacity-90">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(21,92,255,0.45),rgba(3,10,28,0.98))]" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom,rgba(2,8,22,0.95),#020713)]" />
-        <div
-          className="absolute -top-40 -left-24 rounded-full bg-linear-to-br from-[#1b3bff]/70 via-[#4a6bff]/60 to-transparent blur-3xl opacity-70"
-          style={{ width: "30rem", height: "30rem" }}
-        />
-        <div
-          className="absolute bottom-0 -right-48 rounded-full bg-linear-to-tl from-[#041e5e]/80 via-[#1c2d73]/65 to-transparent blur-3xl opacity-90"
-          style={{ width: "42rem", height: "42rem" }}
-        />
-      </div>
+      <PageBackdrop variant="predict" />
       <BackgroundGrid className="z-10 opacity-50" />
 
       <motion.div
@@ -1289,6 +1279,8 @@ function PredictPage() {
                   variants={slideBlurVariants}
                   custom={0.16}
                   className="mt-6 grid gap-4 sm:grid-cols-2"
+                  role="radiogroup"
+                  aria-label="Choose inference model"
                 >
                   {modelOptions.map((option, index) => {
                     const isActive = activeModelId === option.id;
@@ -1346,6 +1338,10 @@ function PredictPage() {
                         type="button"
                         disabled={isDisabled}
                         onClick={() => handleModelSelect(option.id)}
+                        role="radio"
+                        aria-checked={isActive}
+                        aria-pressed={isActive}
+                        aria-disabled={isDisabled || undefined}
                         whileTap={{ scale: 0.98 }}
                         {...revealProps}
                         custom={buttonDelay}
@@ -1547,12 +1543,19 @@ function PredictPage() {
                     combined views to isolate behaviour.
                   </p>
                 </div>
-                <div className="inline-flex rounded-full border border-white/12 bg-white/10 p-1 text-xs font-semibold text-white/60">
+                <div
+                  className="inline-flex rounded-full border border-white/12 bg-white/10 p-1 text-xs font-semibold text-white/60"
+                  role="radiogroup"
+                  aria-label="Comparison view"
+                >
                   {chartButtons.map((button) => (
                     <button
                       key={button.id}
                       type="button"
                       onClick={() => handleChartViewChange(button.id)}
+                      role="radio"
+                      aria-checked={chartView === button.id}
+                      aria-pressed={chartView === button.id}
                       className={`rounded-full px-4 py-1 transition ${
                         chartView === button.id
                           ? "bg-[#08142b]/90 text-cyan-200 shadow-[0_0_25px_-10px_rgba(56,189,248,0.7)]"
