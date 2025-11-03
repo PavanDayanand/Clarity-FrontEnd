@@ -2130,7 +2130,7 @@ function PredictPage() {
               className={primaryButtonClasses}
             >
               <span className="text-base leading-none">↗</span>
-              <span>View Grad-CAM</span>
+              <span>View Heat Map</span>
               <span className={buttonDotClasses} />
             </motion.button>
             <motion.button

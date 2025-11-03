@@ -1,14 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import {
-  AnimatePresence,
-  LayoutGroup,
-  motion,
-  useMotionTemplate,
-  useMotionValue,
-  useSpring,
-  useTransform,
-} from "framer-motion";
+import { AnimatePresence, LayoutGroup, motion as Motion } from "framer-motion";
 import { buttonDotClasses, primaryButtonClasses } from "../styles/ui.js";
 import { defaultDisease } from "../data/diseases.js";
 import { entryOverlayStyle, exitOverlayStyle } from "../styles/transitions.js";
@@ -31,25 +23,6 @@ import {
   resolveModelKey,
   resolveModelLabel,
 } from "../utils/modelUtils.js";
-
-const infoCards = [
-  {
-    title: "What is the heatmap?",
-    body: "Gradient-weighted Class Activation Mapping projects the weighted gradients from the final convolutional layers back onto the image. The resulting heatmap reveals which anatomical structures amplified the network's logits for a chosen class.",
-  },
-  {
-    title: "Why clinicians value it",
-    body: "Saliency focus acts as a visual audit log. When the algorithm highlights the same parenchymal patterns that a radiologist would scrutinise, confidence in automation rises. If it locks onto irrelevant anatomy, the flag prompts manual review before sign-off.",
-  },
-  {
-    title: "Interpretation workflow",
-    body: "Overlay heatmaps with quantitative confidence bars: agree, defer, or escalate. Annotated disagreements become labelled feedback, letting the data science team retrain on real-world miss patterns and improve future triage accuracy.",
-  },
-  {
-    title: "Limits to remember",
-    body: "The heatmap visualises spatial attention, not causality. Dense opacities, overlapping conditions, or adversarial noise can distort the signal. Always correlate the map with the patient history, raw image, and structured predictions.",
-  },
-];
 
 const smoothTransition = { duration: 0.7, ease: [0.16, 1, 0.3, 1] };
 const DEFAULT_HEATMAP_METHOD = "gradcam_pp";
@@ -250,53 +223,12 @@ function GradcamPage() {
   const [viewMode, setViewMode] = useState("original");
   const [isTransitioning, setIsTransitioning] = useState(false);
   const pendingNavigation = useRef(null);
-  const cardTiltX = useMotionValue(0);
-  const cardTiltY = useMotionValue(0);
-  const cardGlowStrength = useMotionValue(0);
-  const smoothTiltX = useSpring(cardTiltX, {
-    stiffness: 220,
-    damping: 24,
-    mass: 0.6,
-  });
-  const smoothTiltY = useSpring(cardTiltY, {
-    stiffness: 220,
-    damping: 24,
-    mass: 0.6,
-  });
-  const smoothGlow = useSpring(cardGlowStrength, {
-    stiffness: 160,
-    damping: 32,
-    mass: 0.8,
-  });
-  const cardTransform = useMotionTemplate`perspective(1400px) rotateX(${smoothTiltX}deg) rotateY(${smoothTiltY}deg)`;
-  const cardGlowOpacity = useTransform(smoothGlow, [0, 1], [0, 0.55]);
-  const cardBorderOpacity = useTransform(smoothGlow, [0, 1], [0.22, 0.68]);
-
-  const handleCardPointerMove = useCallback(
-    (event) => {
-      const bounds = event.currentTarget.getBoundingClientRect();
-      const offsetX = event.clientX - (bounds.left + bounds.width / 2);
-      const offsetY = event.clientY - (bounds.top + bounds.height / 2);
-      const tiltLimit = 8;
-      cardTiltX.set((-offsetY / bounds.height) * tiltLimit);
-      cardTiltY.set((offsetX / bounds.width) * tiltLimit);
-      cardGlowStrength.set(1);
-    },
-    [cardGlowStrength, cardTiltX, cardTiltY]
-  );
-
-  const handleCardPointerLeave = useCallback(() => {
-    cardTiltX.set(0);
-    cardTiltY.set(0);
-    cardGlowStrength.set(0);
-  }, [cardGlowStrength, cardTiltX, cardTiltY]);
-
   useEffect(() => {
     if (!file) {
       showPopup({
         title: "Upload required",
         message:
-          "Return to the home page and add an image to explore heatmaps.",
+          "Return to the home page and add an image to explore Heat Maps.",
         variant: "warning",
       });
       navigate("/", { replace: true });
@@ -424,7 +356,7 @@ function GradcamPage() {
         }
 
         if (data?.success === false) {
-          throw new Error(data?.message ?? "Heatmap request failed.");
+          throw new Error(data?.message ?? "Heat Map request failed.");
         }
 
         const rawImage = data?.heatmap_image ?? data?.heatmapImage ?? null;
@@ -472,11 +404,11 @@ function GradcamPage() {
         if (!isActive || error?.name === "AbortError") {
           return;
         }
-        console.error("Heatmap generation failed", error);
-        setHeatmapError(error.message ?? "Unable to generate heatmap.");
+        console.error("Heat Map generation failed", error);
+        setHeatmapError(error.message ?? "Unable to generate Heat Map.");
         showPopup({
-          title: "Heatmap generation failed",
-          message: error.message ?? "Unable to generate heatmap.",
+          title: "Heat Map generation failed",
+          message: error.message ?? "Unable to generate Heat Map.",
           variant: "danger",
         });
       })
@@ -669,7 +601,7 @@ function GradcamPage() {
       <PageBackdrop variant="predict" />
       <BackgroundGrid className="z-10 opacity-20" />
 
-      <motion.div
+      <Motion.div
         className="pointer-events-none absolute inset-0 z-20 backdrop-blur-[1.5px]"
         style={entryOverlayStyle}
         initial={{ opacity: 0.4 }}
@@ -679,7 +611,7 @@ function GradcamPage() {
 
       <AnimatePresence>
         {isTransitioning ? (
-          <motion.div
+          <Motion.div
             key="gradcam-exit-overlay"
             className="pointer-events-auto absolute inset-0 z-30 backdrop-blur-[1.5px]"
             style={exitOverlayStyle}
@@ -706,34 +638,34 @@ function GradcamPage() {
         </header>
 
         <main className="flex-1">
-          <motion.section
+          <Motion.section
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ ...smoothTransition, delay: 0.1 }}
             className="mx-auto w-full max-w-3xl pt-16 text-center"
           >
-            <motion.h1
+            <Motion.h1
               initial={{ opacity: 0, y: 24 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ ...smoothTransition, delay: 0.15 }}
               className="text-4xl font-semibold tracking-tight sm:text-5xl"
             >
               <span className="gradient-flow-text text-transparent bg-clip-text bg-[linear-gradient(120deg,#06183a,#0ea5e9,#1e3a8a,#0ea5e9)]">
-                Heat map Visualization
+                Heat Map Visualization
               </span>
-            </motion.h1>
-            <motion.p
+            </Motion.h1>
+            <Motion.p
               initial={{ opacity: 0, y: 24 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ ...smoothTransition, delay: 0.25 }}
               className="mt-5 text-base italic text-white/70 sm:text-xl"
             >
-              The heatmap highlights the regions in the X-ray where the model
+              The Heat Map highlights the regions in the X-ray where the model
               focuses while predicting the disease.
-            </motion.p>
-          </motion.section>
+            </Motion.p>
+          </Motion.section>
 
-          <motion.section
+          <Motion.section
             initial={{ opacity: 0, y: 40 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ ...smoothTransition, delay: 0.2 }}
@@ -746,15 +678,15 @@ function GradcamPage() {
                     Imaging Explorer
                   </h2>
                   <p className="mt-2 text-sm italic text-white/65 sm:text-base">
-                    Toggle between the clinician upload and heatmap response for{" "}
-                    {fileName}.
+                    Toggle between the clinician upload and Heat Map response
+                    for {fileName}.
                   </p>
                 </div>
                 <LayoutGroup id="gradcam-toggle">
                   <div className="inline-flex items-center rounded-full bg-white/10 p-1">
                     {[
                       { id: "original", label: "Original" },
-                      { id: "heatmap", label: "Heatmap" },
+                      { id: "heatmap", label: "Heat Map" },
                     ].map((option) => {
                       const isActive = viewMode === option.id;
                       return (
@@ -769,7 +701,7 @@ function GradcamPage() {
                           }`}
                         >
                           {isActive ? (
-                            <motion.span
+                            <Motion.span
                               layoutId="toggle-pill"
                               className="absolute inset-0 rounded-full bg-white/10"
                               transition={{
@@ -866,7 +798,7 @@ function GradcamPage() {
               <div className="relative flex w-full items-center justify-center overflow-hidden rounded-[28px] border border-white/5 bg-black/60 px-4 py-6 shadow-[0_50px_110px_-60px_rgba(37,99,235,0.6)]">
                 <AnimatePresence mode="wait">
                   {viewMode === "original" ? (
-                    <motion.img
+                    <Motion.img
                       key="original"
                       src={originalImage}
                       alt="Original chest radiograph"
@@ -877,7 +809,7 @@ function GradcamPage() {
                       transition={{ duration: 0.5, ease: "easeOut" }}
                     />
                   ) : (
-                    <motion.div
+                    <Motion.div
                       key="heatmap"
                       className="relative flex h-full w-full items-center justify-center"
                       initial={{ opacity: 0 }}
@@ -887,7 +819,7 @@ function GradcamPage() {
                     >
                       <img
                         src={effectiveHeatmap}
-                        alt="Heatmap overlay"
+                        alt="Heat Map overlay"
                         className="h-auto w-full max-w-2xl object-contain"
                       />
                       {isHeatmapLoading ? (
@@ -899,7 +831,7 @@ function GradcamPage() {
                         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(252,70,107,0.55),rgba(56,189,248,0.2),transparent_78%)] mix-blend-screen" />
                       ) : null}
                       <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-black/30 via-transparent to-transparent" />
-                    </motion.div>
+                    </Motion.div>
                   )}
                 </AnimatePresence>
               </div>
@@ -911,7 +843,7 @@ function GradcamPage() {
                   className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-5 py-2 text-sm font-semibold text-white/85 transition hover:border-cyan-300/40 hover:bg-white/15"
                 >
                   <span className="inline-flex h-2 w-2 rounded-full bg-cyan-300" />
-                  Download {viewMode === "heatmap" ? "Heatmap" : "Original"}
+                  Download {viewMode === "heatmap" ? "Heat Map" : "Original"}
                 </button>
               </div>
 
@@ -962,7 +894,7 @@ function GradcamPage() {
               </div>
             </div>
 
-            <motion.div
+            <Motion.div
               initial={{ opacity: 0, y: 40 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ ...smoothTransition, delay: 0.25 }}
@@ -975,7 +907,7 @@ function GradcamPage() {
                       Model selector
                     </h3>
                     <p className="mt-1 text-xs text-white/60">
-                      Pick a network to regenerate heatmap focus.
+                      Pick a network to regenerate Heat Map focus.
                     </p>
                   </div>
                   <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.32em] text-white/60">
@@ -1080,17 +1012,17 @@ function GradcamPage() {
                   ? ` · Focus ${topHeatmapPercent}%`
                   : ""}
               </div>
-            </motion.div>
-          </motion.section>
+            </Motion.div>
+          </Motion.section>
 
-          <motion.section
+          <Motion.section
             initial={{ opacity: 0, y: 40 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.3 }}
             transition={{ ...smoothTransition, delay: 0.15 }}
             className="relative mt-14 mx-auto w-full max-w-6xl px-2 sm:px-6"
           >
-            <motion.div
+            <Motion.div
               initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, amount: 0.3 }}
@@ -1099,26 +1031,26 @@ function GradcamPage() {
             >
               <span className="pointer-events-none absolute inset-0 rounded-[inherit] border border-white/10" />
               <h3 className="text-lg font-semibold text-white">
-                What is Heat Map?
+                What is the Heat Map?
               </h3>
               <p className="text-sm leading-relaxed text-white/70">
-                A heatmap translates model attention into color, projecting the
+                A Heat Map translates model attention into color, projecting the
                 areas of an image that contribute most to a prediction. In our
                 viewer, it guides clinicians toward the regions the neural
                 network considers critical before they sign off on a case.
               </p>
               <p className="text-sm leading-relaxed text-white/70">
-                Teams use heatmaps to validate automated findings, surface
+                Teams use Heat Maps to validate automated findings, surface
                 unexpected focus points, and capture annotated feedback for
                 retraining. The approach builds trust in AI-assisted triage,
                 speeds peer review, and helps identify improvement targets for
                 future model releases.
               </p>
               <div className="pointer-events-none absolute -top-6 -left-6 h-36 w-36 rounded-full bg-[radial-gradient(circle,rgba(56,189,248,0.35),transparent_65%)] blur-3xl" />
-            </motion.div>
-          </motion.section>
+            </Motion.div>
+          </Motion.section>
 
-          <motion.section
+          <Motion.section
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ ...smoothTransition, delay: 0.35 }}
@@ -1151,18 +1083,18 @@ function GradcamPage() {
               <span>Home</span>
               <span className={buttonDotClasses} />
             </button>
-          </motion.section>
+          </Motion.section>
         </main>
       </div>
 
-      <motion.div
+      <Motion.div
         initial={{ opacity: 0, y: 20 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, amount: 0.2 }}
         transition={{ ...smoothTransition, delay: 0.4 }}
       >
         <Footer />
-      </motion.div>
+      </Motion.div>
     </div>
   );
 }

@@ -6,7 +6,7 @@ export const featurePages = [
     icon: "predict",
   },
   {
-    label: "Grad-CAM",
+    label: "Heat Map",
     description: "Visual explanations",
     path: "/gradcam",
     icon: "gradcam",

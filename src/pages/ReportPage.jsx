@@ -181,7 +181,7 @@ const isRecoverableImageSource = (value) => {
 const reportInfoCards = [
   {
     title: "What is Report Studio?",
-    body: "Guided authoring stitches AI findings, clinician notes, and Grad-CAM overlays into a printable brief that mirrors hospital-ready formatting.",
+    body: "Guided authoring stitches AI findings, clinician notes, and Heat Map overlays into a printable brief that mirrors hospital-ready formatting.",
   },
   {
     title: "Why it matters",
@@ -481,7 +481,7 @@ const buildFallbackReport = (fileName, findingName, confidencePercent) => {
     : 0;
   const friendlyFinding = resolvedFinding.toLowerCase();
 
-  return `Clarity AI Thoracic Report\n\nStudy: ${fileName}\nPrimary Finding: ${resolvedFinding}\nConfidence: ${resolvedConfidence}%\n\nHighlights:\n- Grad-CAM corroborates the focus regions consistent with ${friendlyFinding}.\n- No conflicting anomalies surfaced on bilateral comparison heuristics.\n- Recommend correlating with lab values and symptom onset to confirm diagnosis.\n\nRecommended Actions:\n1. Review Grad-CAM overlay for localisation context.\n2. Append attending commentary before finalising export.\n3. Dispatch PDF to PACS and notify MDT channel.`;
+  return `Clarity AI Thoracic Report\n\nStudy: ${fileName}\nPrimary Finding: ${resolvedFinding}\nConfidence: ${resolvedConfidence}%\n\nHighlights:\n- Heat Map corroborates the focus regions consistent with ${friendlyFinding}.\n- No conflicting anomalies surfaced on bilateral comparison heuristics.\n- Recommend correlating with lab values and symptom onset to confirm diagnosis.\n\nRecommended Actions:\n1. Review Heat Map overlay for localisation context.\n2. Append attending commentary before finalising export.\n3. Dispatch PDF to PACS and notify MDT channel.`;
 };
 
 function ReportPage() {
@@ -1345,7 +1345,7 @@ function ReportPage() {
               />
               <span className="pointer-events-none absolute inset-0 rounded-[inherit] border border-white/10" />
               <span className="pointer-events-none absolute -top-10 left-6 text-xs font-semibold uppercase tracking-[0.28em] text-sky-200/70">
-                grad-cam
+                heat map
               </span>
             </div>
           </motion.div>
@@ -1371,7 +1371,7 @@ function ReportPage() {
               transition={{ ...smoothTransition, delay: 0.25 }}
               className="mt-5 text-base italic text-white/70 sm:text-xl"
             >
-              Configure printable briefs, merge Grad-CAM evidence, and surface
+              Configure printable briefs, merge Heat Map evidence, and surface
               key talking points before multidisciplinary rounds.
             </motion.p>
             {isLoading ? (
@@ -2010,7 +2010,7 @@ function ReportPage() {
               className={primaryButtonClasses}
             >
               <span className="text-base leading-none">↗️</span>
-              <span>Review Grad-CAM</span>
+              <span>Review Heat Map</span>
               <span className={buttonDotClasses} />
             </button>
             <button

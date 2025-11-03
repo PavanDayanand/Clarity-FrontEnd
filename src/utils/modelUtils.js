@@ -20,9 +20,9 @@ export const MODEL_CONFIG = {
     label: "ResNet152",
     tagline: "Deep residual architecture prioritising precision.",
     summary:
-      "152-layer residual backbone optimised for rapid triage with faster Grad-CAM generation.",
+      "152-layer residual backbone optimised for rapid triage with faster Heat Map generation.",
     badges: ["vision", "speed"],
-    footnote: "Faster heatmaps · CAM focused",
+    footnote: "Faster Heat Maps · CAM focused",
   },
 };
 
