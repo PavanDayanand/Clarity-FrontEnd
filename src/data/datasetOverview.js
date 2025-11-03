@@ -10,8 +10,7 @@ export const datasetMeta = {
 };
 
 export const datasetDescription = [
-  "Chest X-ray exams are widely used, low-cost imaging studies, yet interpreting them reliably can be harder than reading a chest CT.",
-  "This NIH release packages 112k studies from 30k patients with weakly supervised labels mined from the original radiology reports (Wang et al., ChestX-ray8).",
+  "Chest X-ray exams are widely used, low-cost imaging studies, yet interpreting them reliably can be harder than reading a chest CT. This NIH release packages 112k studies from 30k patients with weakly supervised labels mined from the original radiology reports (Wang et al., ChestX-ray8).",
 ];
 
 export const diseaseDistribution = [

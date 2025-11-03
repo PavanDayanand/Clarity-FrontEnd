@@ -6,6 +6,7 @@ import PrimaryNav from "../components/PrimaryNav.jsx";
 import Footer from "../components/Footer.jsx";
 import BackgroundGrid from "../components/ui/BackgroundGrid.jsx";
 import PageBackdrop from "../components/ui/PageBackdrop.jsx";
+import ScrollIndicator from "../components/ui/ScrollIndicator.jsx";
 import useScrollToTop from "../hooks/useScrollToTop.js";
 import { MODEL_LIST } from "../utils/modelUtils.js";
 
@@ -113,7 +114,10 @@ const AnimatedNumber = ({
       const progress = duration <= 0 ? 1 : Math.min(elapsed / duration, 1);
       const eased = easing(progress);
       const nextValue = progress >= 1 ? target : target * eased;
-      setDisplayValue(nextValue);
+      const roundedValue = Number.isInteger(target)
+        ? Math.round(nextValue)
+        : nextValue;
+      setDisplayValue(roundedValue);
       if (progress < 1) {
         frameId = requestAnimationFrame(animate);
       }
@@ -137,6 +141,34 @@ const AnimatedNumber = ({
 };
 
 const clamp01 = (value) => Math.min(1, Math.max(0, value ?? 0));
+
+const normalizeShares = (shares) => {
+  if (!Array.isArray(shares) || shares.length === 0) {
+    return [];
+  }
+
+  const safeValues = shares.map((value) => {
+    const numeric = Number.isFinite(value) ? value : Number(value);
+    return numeric > 0 ? numeric : 0;
+  });
+
+  const sum = safeValues.reduce((acc, value) => acc + value, 0);
+
+  if (sum <= 0) {
+    return safeValues.map(() => 0);
+  }
+
+  const normalized = safeValues.map((value) => clamp01(value / sum));
+  const total = normalized.reduce((acc, value) => acc + value, 0);
+  const remainder = 1 - total;
+
+  if (normalized.length > 0 && Math.abs(remainder) > 1e-6) {
+    const lastIndex = normalized.length - 1;
+    normalized[lastIndex] = clamp01(normalized[lastIndex] + remainder);
+  }
+
+  return normalized;
+};
 
 const polarToCartesian = (cx, cy, radius, angle) => ({
   x: cx + radius * Math.cos(angle),
@@ -195,12 +227,13 @@ const DataPage = () => {
 
   return (
     <Motion.div
-      className="relative min-h-screen bg-slate-950 text-slate-100"
+      className="relative min-h-screen overflow-x-hidden bg-slate-950 text-slate-100"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.4 }}
     >
+      <ScrollIndicator className="right-3 sm:right-5 md:right-7 lg:right-12" />
       <AnimatedBackground />
       <PageBackdrop />
       <BackgroundGrid className="opacity-50" opacity={0.06} />
@@ -212,30 +245,23 @@ const DataPage = () => {
         <main className="flex-1">
           <div className="mx-auto flex w-full max-w-6xl flex-col gap-16 px-6 pt-10 sm:px-10 lg:px-12">
             <div className="relative text-center">
-              <h1 className="pb-4 text-6xl font-black uppercase tracking-wide text-white">
-                <Motion.span
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.6, delay: 0.1 }}
-                  className="relative inline-block bg-linear-to-b from-white to-slate-400 bg-clip-text text-transparent"
-                >
-                  Dataset
-                </Motion.span>
-                <br />
-                <Motion.span
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.6, delay: 0.2 }}
-                  className="relative inline-block bg-linear-to-b from-sky-200 to-sky-600 bg-clip-text text-transparent"
-                >
-                  Overview
-                </Motion.span>
-              </h1>
+              <Motion.h1
+                initial={{ opacity: 0, y: 32, filter: "blur(18px)" }}
+                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                transition={{ delay: 0.1, duration: 0.7, ease: "easeOut" }}
+                style={{ willChange: "transform, filter" }}
+                className="mx-auto max-w-3xl text-5xl font-semibold leading-tight tracking-[-0.03em] text-white sm:text-6xl md:text-7xl"
+              >
+                <span className="gradient-flow-text block text-transparent bg-clip-text bg-[linear-gradient(120deg,#040b1a,#0ea5e9,#1e3a8a,#0ea5e9)]">
+                  Dataset Overview
+                </span>
+              </Motion.h1>
               <Motion.p
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.3 }}
-                className="mx-auto mt-4 max-w-2xl text-lg text-slate-400"
+                initial={{ opacity: 0, y: 24, filter: "blur(16px)" }}
+                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                transition={{ duration: 0.6, delay: 0.25, ease: "easeOut" }}
+                style={{ willChange: "transform, filter" }}
+                className="mx-auto mt-6 max-w-2xl text-lg italic text-white/70 sm:text-xl"
               >
                 Explore the NIH ChestX-ray14 dataset and model performance
                 metrics
@@ -256,9 +282,9 @@ const DataPage = () => {
             />
           </div>
         </main>
-
-        <Footer />
       </div>
+
+      <Footer />
     </Motion.div>
   );
 };
@@ -268,14 +294,10 @@ const DatasetIntro = () => {
     <Motion.section
       className="grid gap-8 lg:grid-cols-[3fr,2fr]"
       initial={{ opacity: 0, y: 24 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, amount: 0.3 }}
+      animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, ease: "easeOut" }}
     >
       <div className="space-y-6">
-        <span className="inline-flex items-center gap-2 rounded-full border border-slate-700/70 bg-slate-900/60 px-4 py-1 text-xs uppercase tracking-[0.32em] text-sky-300">
-          Dataset Overview
-        </span>
         <h1 className="text-3xl font-semibold text-slate-50 sm:text-4xl lg:text-5xl">
           {datasetMeta.name}: context for model governance
         </h1>
@@ -917,7 +939,11 @@ const DonutCard = ({ title, data }) => {
   const total = data.reduce((sum, item) => sum + item.count, 0);
   const radius = 34;
   const circumference = 2 * Math.PI * radius;
-  let offset = 0;
+  const palette = ["#38bdf8", "#818cf8", "#e0e7ff"];
+  const legendPalette = ["bg-sky-300", "bg-indigo-300", "bg-blue-200"];
+  const sectors = data.map((item) => (total > 0 ? item.count / total : 0));
+  const normalizedSectors = normalizeShares(sectors);
+  let accumulated = 0;
 
   return (
     <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-slate-950/75 p-6 shadow-[0_24px_90px_-55px_rgba(59,130,246,0.55)]">
@@ -942,10 +968,9 @@ const DonutCard = ({ title, data }) => {
             stroke="rgba(148,163,184,0.2)"
             strokeWidth="12"
           />
-          {data.map((item, index) => {
-            const share = item.count / total;
-            const dash = share * circumference;
-            const palette = ["#38bdf8", "#818cf8", "#e0e7ff"];
+          {normalizedSectors.map((share, index) => {
+            const item = data[index];
+            const dash = clamp01(share) * circumference;
             const color = palette[index % palette.length];
             const element = (
               <circle
@@ -958,36 +983,41 @@ const DonutCard = ({ title, data }) => {
                 strokeWidth="12"
                 strokeDasharray={`${dash} ${circumference}`}
                 strokeDashoffset={
-                  -(offset * circumference) + circumference * 0.25
+                  -(accumulated * circumference) + circumference * 0.25
                 }
                 strokeLinecap="round"
               />
             );
-            offset += share;
+            accumulated += share;
             return element;
           })}
         </svg>
         <div className="relative flex-1 space-y-3 text-sm text-slate-300">
-          {data.map((item, index) => (
-            <div
-              key={item.label}
-              className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3"
-            >
-              <div className="flex items-center gap-3">
-                <span
-                  className={`h-2.5 w-2.5 rounded-full ${
-                    index === 0 ? "bg-sky-300" : "bg-indigo-300"
-                  }`}
+          {normalizedSectors.map((share, index) => {
+            const item = data[index];
+            return (
+              <div
+                key={item.label}
+                className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3"
+              >
+                <div className="flex items-center gap-3">
+                  <span
+                    className={`h-2.5 w-2.5 rounded-full ${
+                      legendPalette[index % legendPalette.length]
+                    }`}
+                  />
+                  <span className="font-medium text-slate-100">
+                    {item.label}
+                  </span>
+                </div>
+                <AnimatedNumber
+                  value={share}
+                  formatter={formatPercent}
+                  className="tabular-nums text-base font-semibold text-slate-100"
                 />
-                <span className="font-medium text-slate-100">{item.label}</span>
               </div>
-              <AnimatedNumber
-                value={item.count / total}
-                formatter={formatPercent}
-                className="tabular-nums text-base font-semibold text-slate-100"
-              />
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>
@@ -1340,12 +1370,6 @@ const RadarChart = ({ series }) => {
 const ClassMetricHeatmap = ({ metric, modelKeys }) => {
   const labelWidth = 160;
   const gridTemplate = `minmax(${labelWidth}px,1.1fr) repeat(${modelKeys.length}, minmax(140px,1fr))`;
-  const maxValue = useMemo(() => {
-    const values = classMetrics.flatMap((row) =>
-      modelKeys.map((key) => clamp01(row[key]?.[metric]))
-    );
-    return values.length ? Math.max(...values) : 1;
-  }, [metric, modelKeys]);
 
   return (
     <div className="relative mt-6 overflow-hidden rounded-3xl border border-white/10 bg-slate-950/85 p-4 shadow-[0_24px_90px_-60px_rgba(59,130,246,0.45)]">
@@ -1378,7 +1402,6 @@ const ClassMetricHeatmap = ({ metric, modelKeys }) => {
                 <MetricCell
                   key={`${row.label}-${key}`}
                   value={row[key]?.[metric] ?? 0}
-                  maxValue={maxValue}
                   color={
                     MODEL_COLORS[key] ??
                     BAR_COLORS[colIndex % BAR_COLORS.length]
@@ -1401,12 +1424,10 @@ const getIndicatorColor = (pct, color) => {
   return hexToRgba(color, 0.55);
 };
 
-const MetricCell = ({ value, maxValue, color, alternate }) => {
-  const pct = clamp01(maxValue === 0 ? 0 : value / maxValue);
-  const basePercent = pct * 100;
-  const visualPercent = pct === 0 ? 0 : Math.min(Math.max(basePercent, 8), 100);
-  const fillPercent = visualPercent;
-  const indicatorPercent = visualPercent;
+const MetricCell = ({ value, color, alternate }) => {
+  const pct = clamp01(value);
+  const fillPercent = pct * 100;
+  const indicatorPercent = fillPercent;
   const indicatorColor = getIndicatorColor(pct, color);
 
   return (
@@ -1486,10 +1507,11 @@ const AverageRings = ({ modelKeys }) => {
           `ring-${key}`.replace(/[^a-zA-Z0-9_-]/g, "") || "ring";
         const cardStyle = {
           borderRadius: "1.75rem",
-          background: `linear-gradient(135deg, rgba(15,23,42,0.96) 4%, ${hexToRgba(
-            color,
-            0.14
-          )} 52%, rgba(15,23,42,0.92) 100%)`,
+          //remove this to remove box gradient
+          // background: `linear-gradient(135deg, rgba(15,23,42,0.96) 4%, ${hexToRgba(
+          //   color,
+          //   0.14
+          // )} 52%, rgba(15,23,42,0.92) 100%)`,
           boxShadow: `0 32px 140px -80px ${hexToRgba(color, 0.68)}`,
         };
 
@@ -1644,11 +1666,11 @@ const AccuracyRing = ({ metrics, color, id }) => {
   );
 
   const glowId = `${sanitizedId}-glow`;
-  const accuracyGradientId = `${sanitizedId}-accuracy-gradient`;
-  const precisionGradientId = `${sanitizedId}-precision-gradient`;
-  const recallGradientId = `${sanitizedId}-recall-gradient`;
-  const trackGradientId = `${sanitizedId}-track-gradient`;
-  const coreGradientId = `${sanitizedId}-core-gradient`;
+  const ringColor = hexToRgba(color, 0.9);
+  const secondaryColor = hexToRgba(color, 0.6);
+  const tertiaryColor = hexToRgba(color, 0.45);
+  const trackColor = "rgba(148,163,184,0.2)";
+  const coreFill = hexToRgba(color, 0.1);
 
   return (
     <svg viewBox="0 0 120 120" className="h-28 w-28">
@@ -1660,30 +1682,6 @@ const AccuracyRing = ({ metrics, color, id }) => {
             <feMergeNode in="SourceGraphic" />
           </feMerge>
         </filter>
-        <linearGradient id={trackGradientId} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="rgba(148,163,184,0.18)" />
-          <stop offset="100%" stopColor="rgba(15,23,42,0.55)" />
-        </linearGradient>
-        <linearGradient id={accuracyGradientId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={hexToRgba(color, 0.18)} />
-          <stop offset="55%" stopColor={hexToRgba(color, 0.85)} />
-          <stop offset="100%" stopColor={hexToRgba(color, 0.95)} />
-        </linearGradient>
-        <linearGradient id={precisionGradientId} x1="0" y1="1" x2="1" y2="0">
-          <stop offset="0%" stopColor={hexToRgba(color, 0.12)} />
-          <stop offset="55%" stopColor={hexToRgba(color, 0.7)} />
-          <stop offset="100%" stopColor={hexToRgba(color, 0.82)} />
-        </linearGradient>
-        <linearGradient id={recallGradientId} x1="1" y1="1" x2="0" y2="0">
-          <stop offset="0%" stopColor={hexToRgba(color, 0.1)} />
-          <stop offset="60%" stopColor={hexToRgba(color, 0.55)} />
-          <stop offset="100%" stopColor={hexToRgba(color, 0.75)} />
-        </linearGradient>
-        <radialGradient id={coreGradientId} cx="50%" cy="50%" r="65%">
-          <stop offset="0%" stopColor={hexToRgba(color, 0.22)} />
-          <stop offset="70%" stopColor={hexToRgba(color, 0.08)} />
-          <stop offset="100%" stopColor={hexToRgba(color, 0)} />
-        </radialGradient>
       </defs>
 
       <circle
@@ -1691,7 +1689,7 @@ const AccuracyRing = ({ metrics, color, id }) => {
         cy="60"
         r={outerRadius}
         fill="none"
-        stroke={`url(#${trackGradientId})`}
+        stroke={trackColor}
         strokeWidth="12"
       />
       <circle
@@ -1716,7 +1714,7 @@ const AccuracyRing = ({ metrics, color, id }) => {
         cy="60"
         r={outerRadius}
         fill="none"
-        stroke={`url(#${accuracyGradientId})`}
+        stroke={ringColor}
         strokeWidth="12"
         strokeDasharray={`${accuracyDash} ${outerCircumference}`}
         strokeDashoffset={offsetOuter}
@@ -1728,7 +1726,7 @@ const AccuracyRing = ({ metrics, color, id }) => {
         cy="60"
         r={middleRadius}
         fill="none"
-        stroke={`url(#${precisionGradientId})`}
+        stroke={secondaryColor}
         strokeWidth="8"
         strokeDasharray={`${precisionDash} ${middleCircumference}`}
         strokeDashoffset={offsetMiddle}
@@ -1739,7 +1737,7 @@ const AccuracyRing = ({ metrics, color, id }) => {
         cy="60"
         r={innerRadius}
         fill="none"
-        stroke={`url(#${recallGradientId})`}
+        stroke={tertiaryColor}
         strokeWidth="6"
         strokeDasharray={`${recallDash} ${innerCircumference}`}
         strokeDashoffset={offsetInner}
@@ -1772,8 +1770,8 @@ const AccuracyRing = ({ metrics, color, id }) => {
         cx="60"
         cy="60"
         r="28"
-        fill={`url(#${coreGradientId})`}
-        stroke={hexToRgba(color, 0.24)}
+        fill={coreFill}
+        stroke={secondaryColor}
         strokeWidth="1"
       />
       <text
