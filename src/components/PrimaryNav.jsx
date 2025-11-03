@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion as Motion } from "framer-motion";
 import { featurePages } from "../data/featurePages.js";
 
 const iconBackgrounds = {
@@ -122,10 +122,21 @@ export default function PrimaryNav({
   aboutPath = "/#about",
   dataPath = "/data",
   maxWidthClass = "max-w-6xl",
+  containerClassName = "",
+  navClassName = "",
 }) {
   const [featuresOpen, setFeaturesOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const hoverTimer = useRef(null);
+  const containerClasses = ["relative", containerClassName]
+    .filter(Boolean)
+    .join(" ");
+  const navClasses = [
+    `relative mx-auto flex w-full ${maxWidthClass} flex-col gap-4 overflow-hidden rounded-[40px] border border-white/14 bg-[#0c152b]/75 px-7 py-5 text-sm text-white/80 shadow-[0_28px_70px_-32px_rgba(8,28,70,0.9)] backdrop-blur-[28px] backdrop-saturate-185`,
+    navClassName,
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   const navigateTo = (path) => {
     if (typeof onNavigate === "function") {
@@ -173,8 +184,8 @@ export default function PrimaryNav({
   useEffect(() => () => clearHoverTimer(), []);
 
   return (
-    <div className="relative">
-      <motion.nav
+    <div className={containerClasses}>
+      <Motion.nav
         layout
         initial={{ opacity: 0, y: -16 }}
         animate={{ opacity: 1, y: 0 }}
@@ -183,7 +194,7 @@ export default function PrimaryNav({
           ease: [0.18, 0.95, 0.3, 1],
           layout: { duration: 0.28, ease: [0.2, 0.85, 0.3, 1] },
         }}
-        className={`relative mx-auto flex w-full ${maxWidthClass} flex-col gap-4 overflow-hidden rounded-[40px] border border-white/14 bg-[#0c152b]/75 px-7 py-5 text-sm text-white/80 shadow-[0_28px_70px_-32px_rgba(8,28,70,0.9)] backdrop-blur-[28px] backdrop-saturate-185`}
+        className={navClasses}
         onMouseLeave={scheduleCloseFeatures}
       >
         <div aria-hidden className="pointer-events-none absolute inset-0">
@@ -222,7 +233,7 @@ export default function PrimaryNav({
             </a>
 
             <div className="relative flex items-center">
-              <motion.button
+              <Motion.button
                 type="button"
                 onFocus={openFeatures}
                 onClick={() => setFeaturesOpen((prev) => !prev)}
@@ -233,7 +244,7 @@ export default function PrimaryNav({
                 }`}
               >
                 Features
-                <motion.svg
+                <Motion.svg
                   xmlns="http://www.w3.org/2000/svg"
                   viewBox="0 0 24 24"
                   className="h-4 w-4"
@@ -244,8 +255,8 @@ export default function PrimaryNav({
                     fill="currentColor"
                     d="M12 15.5 5.5 9l1.4-1.4L12 12.7l5.1-5.1L18.5 9Z"
                   />
-                </motion.svg>
-              </motion.button>
+                </Motion.svg>
+              </Motion.button>
             </div>
 
             <a
@@ -293,7 +304,7 @@ export default function PrimaryNav({
 
         <AnimatePresence mode="popLayout">
           {featuresOpen && (
-            <motion.div
+            <Motion.div
               key="feature-drawer"
               layout
               initial={{ opacity: 0, y: -16, scale: 0.98 }}
@@ -316,7 +327,7 @@ export default function PrimaryNav({
                   "from-white/15 via-white/10 to-white/5";
 
                 return (
-                  <motion.button
+                  <Motion.button
                     key={item.label}
                     type="button"
                     onClick={(event) => handleNavigate(event, item.path)}
@@ -344,17 +355,17 @@ export default function PrimaryNav({
                     <span className="text-xs text-white/65">
                       {item.description}
                     </span>
-                  </motion.button>
+                  </Motion.button>
                 );
               })}
-            </motion.div>
+            </Motion.div>
           )}
         </AnimatePresence>
-      </motion.nav>
+      </Motion.nav>
 
       <AnimatePresence>
         {mobileOpen && (
-          <motion.div
+          <Motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
@@ -424,7 +435,7 @@ export default function PrimaryNav({
             >
               About
             </button>
-          </motion.div>
+          </Motion.div>
         )}
       </AnimatePresence>
     </div>
