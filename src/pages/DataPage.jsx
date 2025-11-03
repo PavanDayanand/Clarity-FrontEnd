@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { motion as Motion } from "framer-motion";
 
 import AnimatedBackground from "../components/AnimatedBackground.jsx";
@@ -78,6 +78,64 @@ const percentFormatter = new Intl.NumberFormat("en-US", {
 
 const numberFormatter = new Intl.NumberFormat("en-US");
 
+const formatNumber = (value) => numberFormatter.format(value);
+const formatPercent = (value) => percentFormatter.format(value);
+
+const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
+
+const AnimatedNumber = ({
+  value = 0,
+  formatter = formatNumber,
+  duration = 1200,
+  easing = easeOutCubic,
+  as: Component = "span",
+  className,
+}) => {
+  const numericValue = typeof value === "number" ? value : Number(value);
+  const isNumeric = Number.isFinite(numericValue);
+  const [displayValue, setDisplayValue] = useState(() =>
+    isNumeric ? 0 : value
+  );
+
+  useEffect(() => {
+    if (!isNumeric) {
+      setDisplayValue(value);
+      return;
+    }
+
+    let frameId;
+    let start;
+    const target = numericValue;
+
+    const animate = (timestamp) => {
+      if (start === undefined) start = timestamp;
+      const elapsed = timestamp - start;
+      const progress = duration <= 0 ? 1 : Math.min(elapsed / duration, 1);
+      const eased = easing(progress);
+      const nextValue = progress >= 1 ? target : target * eased;
+      setDisplayValue(nextValue);
+      if (progress < 1) {
+        frameId = requestAnimationFrame(animate);
+      }
+    };
+
+    setDisplayValue(0);
+    frameId = requestAnimationFrame(animate);
+
+    return () => {
+      if (frameId) cancelAnimationFrame(frameId);
+    };
+  }, [duration, easing, isNumeric, numericValue, value]);
+
+  const content = isNumeric ? formatter(displayValue) : displayValue;
+
+  if (Component === Fragment) {
+    return <>{content}</>;
+  }
+
+  return <Component className={className}>{content}</Component>;
+};
+
 const clamp01 = (value) => Math.min(1, Math.max(0, value ?? 0));
 
 const polarToCartesian = (cx, cy, radius, angle) => ({
@@ -145,7 +203,7 @@ const DataPage = () => {
     >
       <AnimatedBackground />
       <PageBackdrop />
-      <BackgroundGrid />
+      <BackgroundGrid className="opacity-50" opacity={0.06} />
       <div className="relative z-10 flex min-h-screen flex-col px-4 pb-24 pt-10 sm:px-8">
         <header className="px-6 pt-8 sm:px-10">
           <PrimaryNav />
@@ -246,45 +304,94 @@ const DatasetIntro = () => {
         </div>
       </div>
 
-      <div className="grid gap-4 rounded-2xl border border-slate-800/60 bg-slate-900/60 p-6">
-        <HighlightStat
-          label="Images curated"
-          value={numberFormatter.format(datasetMeta.totalImages)}
-          hint={`${numberFormatter.format(
-            datasetMeta.uniquePatients
-          )} patients`}
-        />
-        <HighlightStat
-          label="Multi-label cases"
-          value={numberFormatter.format(datasetMeta.multiLabelCases)}
-          hint={`${percentFormatter.format(
-            datasetMeta.multiLabelShare
-          )} of studies`}
-        />
-        <HighlightStat
-          label="Findings tracked"
-          value={datasetMeta.findingsTracked}
-          hint="Thoracic labels monitored"
-        />
+      <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-slate-950/85 p-6 shadow-[0_24px_90px_-55px_rgba(15,23,42,0.7)]">
+        <div className="pointer-events-none absolute inset-0 rounded-3xl border border-white/10 opacity-20" />
+        <div className="relative flex flex-col gap-4">
+          <HighlightStat
+            label="Images curated"
+            badge="Dataset"
+            value={
+              <AnimatedNumber
+                value={datasetMeta.totalImages}
+                formatter={formatNumber}
+              />
+            }
+            hint={
+              <>
+                <AnimatedNumber
+                  value={datasetMeta.uniquePatients}
+                  formatter={formatNumber}
+                />{" "}
+                patients
+              </>
+            }
+          />
+          <HighlightStat
+            label="Multi-label cases"
+            badge="Cadence"
+            value={
+              <AnimatedNumber
+                value={datasetMeta.multiLabelCases}
+                formatter={formatNumber}
+              />
+            }
+            hint={
+              <>
+                <AnimatedNumber
+                  value={datasetMeta.multiLabelShare}
+                  formatter={formatPercent}
+                />{" "}
+                of studies
+              </>
+            }
+          />
+          <HighlightStat
+            label="Findings tracked"
+            badge="Coverage"
+            value={
+              <AnimatedNumber
+                value={datasetMeta.findingsTracked}
+                formatter={formatNumber}
+              />
+            }
+            hint="Thoracic labels monitored"
+          />
+        </div>
       </div>
     </Motion.section>
   );
 };
 
-const HighlightStat = ({ label, value, hint }) => {
+const HighlightStat = ({ label, value, hint, badge }) => {
   return (
-    <div className="rounded-xl border border-slate-800/80 bg-slate-950/70 px-4 py-5">
-      <p className="text-xs uppercase tracking-[0.28em] text-slate-500">
-        {label}
-      </p>
-      <p className="mt-2 text-2xl font-semibold text-slate-50">{value}</p>
-      <p className="mt-1 text-sm text-slate-400">{hint}</p>
+    <div className="relative overflow-hidden rounded-2xl border border-white/12 bg-white/5 px-5 py-6 backdrop-blur">
+      <div className="pointer-events-none absolute inset-0 rounded-2xl border border-white/10 opacity-15" />
+      <div className="relative flex items-center justify-between">
+        <p className="text-[0.65rem] uppercase tracking-[0.36em] text-white/60">
+          {label}
+        </p>
+        {badge ? (
+          <span className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[0.6rem] uppercase tracking-[0.3em] text-white/60">
+            {badge}
+          </span>
+        ) : null}
+      </div>
+      <div className="relative mt-5 flex items-center justify-start gap-4">
+        <p className="text-4xl font-semibold tracking-tight text-slate-50">
+          {value}
+        </p>
+      </div>
+      <p className="relative mt-3 text-sm text-slate-300">{hint}</p>
     </div>
   );
 };
 
 const DatasetBreakdown = () => {
   const [hoveredIndex, setHoveredIndex] = useState(-1);
+
+  const shareValue = clamp01(datasetMeta.multiLabelShare);
+  const multiLabelCases = datasetMeta.multiLabelCases ?? 0;
+  const datasetName = datasetMeta.name ?? "ChestX-ray14";
 
   const enhancedDistribution = useMemo(() => {
     const total = diseaseDistribution.reduce(
@@ -341,8 +448,8 @@ const DatasetBreakdown = () => {
               Complete disease distribution
             </h2>
             <p className="mt-1 text-sm text-slate-400">
-              {numberFormatter.format(totalLabels)} label assignments across 15
-              findings.
+              <AnimatedNumber value={totalLabels} formatter={formatNumber} />{" "}
+              label assignments across 15 findings.
             </p>
           </div>
         </header>
@@ -367,13 +474,25 @@ const DatasetBreakdown = () => {
                 </div>
                 <div className="flex flex-wrap gap-6">
                   <span>
-                    {numberFormatter.format(activeEntry.count)} labels
+                    <AnimatedNumber
+                      value={activeEntry.count}
+                      formatter={formatNumber}
+                    />{" "}
+                    labels
                   </span>
                   <span>
-                    {percentFormatter.format(activeEntry.share)} share
+                    <AnimatedNumber
+                      value={activeEntry.share}
+                      formatter={formatPercent}
+                    />{" "}
+                    share
                   </span>
                   <span>
-                    cumulative {percentFormatter.format(activeEntry.cumulative)}
+                    cumulative{" "}
+                    <AnimatedNumber
+                      value={activeEntry.cumulative}
+                      formatter={formatPercent}
+                    />
                   </span>
                 </div>
               </>
@@ -388,38 +507,95 @@ const DatasetBreakdown = () => {
 
         <footer className="mt-6 grid gap-2 rounded-xl border border-slate-800/70 bg-slate-950/70 p-4 text-sm text-slate-300">
           <p>
-            {numberFormatter.format(datasetMeta.multiLabelCases)} multi-label
-            studies · {percentFormatter.format(datasetMeta.multiLabelShare)}{" "}
+            <AnimatedNumber
+              value={datasetMeta.multiLabelCases}
+              formatter={formatNumber}
+            />{" "}
+            multi-label studies ·{" "}
+            <AnimatedNumber
+              value={datasetMeta.multiLabelShare}
+              formatter={formatPercent}
+            />{" "}
             share
           </p>
           {coverageEntry ? (
             <p className="text-slate-400">
               Top {coverageIndex + 1} findings capture{" "}
-              {percentFormatter.format(coverageEntry.cumulative)} of all label
-              assignments.
+              <AnimatedNumber
+                value={coverageEntry.cumulative}
+                formatter={formatPercent}
+              />{" "}
+              of all label assignments.
             </p>
           ) : null}
         </footer>
       </article>
 
       <aside className="grid gap-6">
-        <div className="rounded-3xl border border-slate-800/60 bg-slate-900/60 p-6">
-          <h3 className="text-sm font-semibold uppercase tracking-[0.3em] text-slate-500">
-            Multi-label cadence
-          </h3>
-          <div className="mt-4 flex items-center gap-6">
-            <GradientCircle value={datasetMeta.multiLabelShare} />
-            <div className="space-y-2 text-sm text-slate-300">
-              <p>
-                {numberFormatter.format(datasetMeta.multiLabelCases)} studies
-                include more than one finding.
-              </p>
-              <p className="text-slate-500">
-                Labels derived with weak supervision from radiology notes.
-              </p>
+        <section className="relative overflow-hidden rounded-3xl border border-white/10 bg-slate-950/85 p-6 shadow-[0_22px_80px_-50px_rgba(15,23,42,0.7)]">
+          <div className="pointer-events-none absolute inset-0 rounded-3xl border border-white/10 opacity-20" />
+          <div className="relative flex flex-col gap-6 text-white">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+              <div className="space-y-3">
+                <p className="text-xs uppercase tracking-[0.32em] text-white/60">
+                  Multi-label cadence
+                </p>
+                <h3 className="text-3xl font-semibold sm:text-4xl">
+                  Cohort coverage at a glance
+                </h3>
+                <p className="text-sm text-white/70">
+                  <AnimatedNumber
+                    value={multiLabelCases}
+                    formatter={formatNumber}
+                    as={Fragment}
+                  />{" "}
+                  studies include more than one finding in {datasetName}.
+                </p>
+              </div>
+              <div className="rounded-3xl border border-white/15 bg-white/10 px-5 py-4 text-right shadow-[0_18px_70px_-40px_rgba(59,130,246,0.35)]">
+                <p className="text-xs uppercase tracking-[0.32em] text-white/60">
+                  dataset share
+                </p>
+                <p className="text-4xl font-semibold tracking-tight">
+                  <AnimatedNumber
+                    value={shareValue}
+                    formatter={formatPercent}
+                  />
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-4 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/70">
+              <div className="flex items-center justify-between">
+                <span className="uppercase tracking-[0.24em] text-white/55">
+                  unique findings monitored
+                </span>
+                <span className="text-base font-semibold text-white">
+                  <AnimatedNumber
+                    value={datasetMeta.findingsTracked}
+                    formatter={formatNumber}
+                  />
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="uppercase tracking-[0.24em] text-white/55">
+                  weekly additions
+                </span>
+                <span className="text-base font-semibold text-white">
+                  <AnimatedNumber
+                    value={datasetMeta.weeklyGrowth ?? 0.018}
+                    formatter={formatPercent}
+                  />
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between text-xs uppercase tracking-[0.28em] text-white/50">
+              <span>weak supervision cadence</span>
+              <span>anchored to {datasetName}</span>
             </div>
           </div>
-        </div>
+        </section>
 
         <div className="grid gap-4 md:grid-cols-2">
           <DonutCard title="View position" data={viewDistribution} />
@@ -431,15 +607,15 @@ const DatasetBreakdown = () => {
 };
 
 const ParetoChart = ({ data, activeIndex, onHover, maxValue }) => {
-  const chartWidth = 880;
-  const chartHeight = 420;
+  const chartWidth = 1400;
+  const chartHeight = 600;
   const padding = { top: 32, right: 110, bottom: 130, left: 110 };
   const usableWidth = chartWidth - padding.left - padding.right;
   const usableHeight = chartHeight - padding.top - padding.bottom;
   const safeMax = maxValue || 1;
   const totalBars = data.length || 1;
   const step = usableWidth / totalBars;
-  const barWidth = Math.min(48, step * 0.62);
+  const barWidth = Math.min(64, step * 0.58);
 
   const hoverHandler = onHover ?? (() => {});
   const handleHover = (index) => hoverHandler(index);
@@ -493,11 +669,51 @@ const ParetoChart = ({ data, activeIndex, onHover, maxValue }) => {
   return (
     <svg
       viewBox={`0 0 ${chartWidth} ${chartHeight}`}
-      className="mx-auto w-full max-w-[880px]"
+      className="mx-auto w-full max-w-[1180px]"
       role="img"
       aria-label="Pareto chart of disease label distribution"
       onMouseLeave={handleLeave}
     >
+      <defs>
+        <filter
+          id="pareto-bar-glow"
+          x="-20%"
+          y="-10%"
+          width="140%"
+          height="140%"
+        >
+          <feDropShadow
+            dx="0"
+            dy="4"
+            stdDeviation="8"
+            floodColor="rgba(37,99,235,0.18)"
+          />
+        </filter>
+        <linearGradient id="pareto-canvas-gradient" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="rgba(15,23,42,0.94)" />
+          <stop offset="45%" stopColor="rgba(10,19,35,0.9)" />
+          <stop offset="100%" stopColor="rgba(6,12,24,0.95)" />
+        </linearGradient>
+        {BAR_GRADIENTS.map((gradient, idx) => (
+          <linearGradient
+            key={`bar-gradient-${idx}`}
+            id={`pareto-bar-${idx}`}
+            x1="0"
+            y1="0"
+            x2="0"
+            y2="1"
+          >
+            <stop offset="0%" stopColor={gradient.highlight} />
+            <stop offset="55%" stopColor={gradient.mid} />
+            <stop offset="100%" stopColor={gradient.shadow} />
+          </linearGradient>
+        ))}
+        <linearGradient id="pareto-bar-sheen" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="rgba(255,255,255,0.55)" />
+          <stop offset="18%" stopColor="rgba(255,255,255,0.2)" />
+          <stop offset="100%" stopColor="rgba(255,255,255,0)" />
+        </linearGradient>
+      </defs>
       <desc>
         Bars show per-class label counts while the curve tracks cumulative share
         across sorted findings.
@@ -507,9 +723,9 @@ const ParetoChart = ({ data, activeIndex, onHover, maxValue }) => {
         y={padding.top}
         width={usableWidth}
         height={usableHeight}
-        fill="rgba(15,23,42,0.55)"
-        stroke="rgba(51,65,85,0.5)"
-        rx={20}
+        fill="url(#pareto-canvas-gradient)"
+        stroke="rgba(51,65,85,0.45)"
+        rx={26}
       />
       {countTicks.map(({ value, ratio }) => {
         const y = padding.top + (1 - ratio) * usableHeight;
@@ -527,7 +743,7 @@ const ParetoChart = ({ data, activeIndex, onHover, maxValue }) => {
               x={padding.left - 14}
               y={y + 4}
               textAnchor="end"
-              className="fill-slate-500 text-[10px] uppercase tracking-[0.25em]"
+              className="fill-slate-400 text-[12px] uppercase tracking-[0.2em]"
             >
               {numberFormatter.format(value)}
             </text>
@@ -549,7 +765,7 @@ const ParetoChart = ({ data, activeIndex, onHover, maxValue }) => {
             <text
               x={padding.left + usableWidth + 18}
               y={y + 4}
-              className="fill-sky-300 text-[10px] uppercase tracking-[0.25em]"
+              className="fill-sky-300 text-[12px] uppercase tracking-[0.2em]"
             >
               {percentFormatter.format(tick)}
             </text>
@@ -588,13 +804,13 @@ const ParetoChart = ({ data, activeIndex, onHover, maxValue }) => {
             y1={padding.top}
             x2={coverageX}
             y2={padding.top + usableHeight}
-            stroke="rgba(251,191,36,0.7)"
+            stroke="rgba(96,165,250,0.55)"
             strokeDasharray="6 6"
           />
           <text
             x={coverageX + 8}
-            y={padding.top + 16}
-            className="fill-amber-200 text-[10px] uppercase tracking-[0.25em]"
+            y={padding.top + 24}
+            className="fill-sky-200 text-[12px] uppercase tracking-[0.25em]"
           >
             80% coverage
           </text>
@@ -606,8 +822,12 @@ const ParetoChart = ({ data, activeIndex, onHover, maxValue }) => {
         const barHeight = ratio * usableHeight;
         const x = padding.left + index * step + (step - barWidth) / 2;
         const y = padding.top + usableHeight - barHeight;
+        const labelCenterX = padding.left + index * step + step / 2;
+        const labelBaseY = padding.top + usableHeight + 56;
         const isActive = index === activeIndex;
-        const color = BAR_COLORS[index % BAR_COLORS.length];
+        const paletteIndex = index % BAR_COLORS.length;
+        const color = BAR_COLORS[paletteIndex];
+        const gradientId = `pareto-bar-${paletteIndex}`;
         const labelLines = item.label.split(/\s+/);
         return (
           <g
@@ -624,108 +844,70 @@ const ParetoChart = ({ data, activeIndex, onHover, maxValue }) => {
               width={barWidth}
               height={Math.max(barHeight, 2)}
               rx={10}
-              fill={color}
-              fillOpacity={isActive ? 0.95 : 0.7}
-              stroke={
-                isActive ? "rgba(59,130,246,0.55)" : "rgba(15,23,42,0.68)"
-              }
-              strokeWidth={1.2}
+              fill={`url(#${gradientId})`}
+              fillOpacity={isActive ? 1 : 0.9}
+              stroke={isActive ? hexToRgba(color, 0.5) : "rgba(15,23,42,0.6)"}
+              strokeWidth={1}
+              filter="url(#pareto-bar-glow)"
+            />
+            <rect
+              x={x + 5}
+              y={y + 8}
+              width={Math.max(barWidth - 10, 0)}
+              height={Math.max(barHeight - 20, 0)}
+              rx={9}
+              fill="url(#pareto-bar-sheen)"
+              opacity={isActive ? 0.28 : 0.16}
+              pointerEvents="none"
             />
             <text
               x={x + barWidth / 2}
-              y={y - 8}
+              y={y - 12}
               textAnchor="middle"
-              className={`tabular-nums text-[11px] font-semibold ${
+              className={`tabular-nums text-[13px] font-semibold ${
                 isActive ? "fill-sky-200" : "fill-slate-400"
               }`}
             >
-              {numberFormatter.format(item.count)}
+              <AnimatedNumber
+                value={item.count}
+                formatter={formatNumber}
+                as={Fragment}
+              />
             </text>
-            <text
-              x={x + barWidth / 2}
-              y={padding.top + usableHeight + 20}
-              textAnchor="middle"
-              className="fill-slate-400 text-[11px]"
+            <g
+              transform={`translate(${labelCenterX} ${labelBaseY}) rotate(-48)`}
+              className="pointer-events-none select-none"
+              aria-hidden="true"
             >
               {labelLines.map((line, lineIndex) => (
-                <tspan
+                <text
                   key={`${item.key}-label-${lineIndex}`}
-                  x={x + barWidth / 2}
-                  dy={lineIndex === 0 ? 0 : 12}
+                  x={0}
+                  y={lineIndex * 16}
+                  textAnchor="end"
+                  className="fill-slate-200 text-[13px] font-medium"
                 >
                   {line}
-                </tspan>
+                </text>
               ))}
-            </text>
+            </g>
           </g>
         );
       })}
 
       <text
-        x={padding.left - 66}
-        y={padding.top - 12}
-        className="fill-slate-500 text-[11px] uppercase tracking-[0.3em]"
+        x={padding.left - 80}
+        y={padding.top - 36}
+        className="fill-slate-400 text-[12px] uppercase tracking-[0.3em]"
       >
         label count
       </text>
       <text
         x={padding.left + usableWidth + 30}
-        y={padding.top - 12}
-        className="fill-sky-300 text-[11px] uppercase tracking-[0.3em]"
+        y={padding.top - 18}
+        className="fill-sky-300 text-[12px] uppercase tracking-[0.3em]"
       >
         cumulative share
-      </text>
-    </svg>
-  );
-};
-
-const GradientCircle = ({ value }) => {
-  const radius = 44;
-  const circumference = 2 * Math.PI * radius;
-  const dash = clamp01(value) * circumference;
-
-  return (
-    <svg viewBox="0 0 120 120" className="h-24 w-24">
-      <defs>
-        <linearGradient id="multi-label-gradient" x1="0" x2="1" y1="0" y2="1">
-          <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.95" />
-          <stop offset="100%" stopColor="#818cf8" stopOpacity="0.75" />
-        </linearGradient>
-      </defs>
-      <circle
-        cx="60"
-        cy="60"
-        r={radius}
-        fill="none"
-        stroke="rgba(148,163,184,0.2)"
-        strokeWidth="12"
-      />
-      <circle
-        cx="60"
-        cy="60"
-        r={radius}
-        fill="none"
-        stroke="url(#multi-label-gradient)"
-        strokeWidth="12"
-        strokeDasharray={`${dash} ${circumference}`}
-        strokeDashoffset={circumference * 0.25}
-        strokeLinecap="round"
-      />
-      <text
-        x="60"
-        y="58"
-        textAnchor="middle"
-        className="fill-slate-50 text-xl font-semibold"
-      >
-        {percentFormatter.format(value)}
-      </text>
-      <text
-        x="60"
-        y="78"
-        textAnchor="middle"
-        className="fill-slate-400 text-xs uppercase tracking-[0.3em]"
-      >
-        share
       </text>
     </svg>
   );
@@ -738,12 +920,20 @@ const DonutCard = ({ title, data }) => {
   let offset = 0;
 
   return (
-    <div className="rounded-3xl border border-slate-800/60 bg-slate-900/60 p-5">
-      <p className="text-xs uppercase tracking-[0.28em] text-slate-500">
-        {title}
-      </p>
-      <div className="mt-4 flex items-center gap-6">
-        <svg viewBox="0 0 112 112" className="h-24 w-24">
+    <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-slate-950/75 p-6 shadow-[0_24px_90px_-55px_rgba(59,130,246,0.55)]">
+      <div className="pointer-events-none absolute -right-16 top-0 h-40 w-40 rounded-full bg-sky-500/20 blur-3xl" />
+      <div className="pointer-events-none absolute -left-16 bottom-0 h-32 w-32 rounded-full bg-indigo-500/15 blur-3xl" />
+      <div className="pointer-events-none absolute inset-0 rounded-3xl border border-white/10 opacity-30" />
+      <div className="relative flex items-center justify-between">
+        <p className="text-xs uppercase tracking-[0.32em] text-white/60">
+          {title}
+        </p>
+        <span className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[0.65rem] uppercase tracking-[0.32em] text-white/60">
+          overview
+        </span>
+      </div>
+      <div className="relative mt-5 flex items-center gap-6">
+        <svg viewBox="0 0 112 112" className="h-28 w-28">
           <circle
             cx="56"
             cy="56"
@@ -755,8 +945,9 @@ const DonutCard = ({ title, data }) => {
           {data.map((item, index) => {
             const share = item.count / total;
             const dash = share * circumference;
-            const color = index === 0 ? "#38bdf8" : "#818cf8";
-            const circleEl = (
+            const palette = ["#38bdf8", "#818cf8", "#e0e7ff"];
+            const color = palette[index % palette.length];
+            const element = (
               <circle
                 key={item.label}
                 cx="56"
@@ -773,22 +964,29 @@ const DonutCard = ({ title, data }) => {
               />
             );
             offset += share;
-            return circleEl;
+            return element;
           })}
         </svg>
-        <div className="space-y-2 text-sm text-slate-300">
+        <div className="relative flex-1 space-y-3 text-sm text-slate-300">
           {data.map((item, index) => (
-            <p key={item.label} className="flex items-center gap-2">
-              <span
-                className={`h-2.5 w-2.5 rounded-full ${
-                  index === 0 ? "bg-sky-300" : "bg-indigo-300"
-                }`}
+            <div
+              key={item.label}
+              className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3"
+            >
+              <div className="flex items-center gap-3">
+                <span
+                  className={`h-2.5 w-2.5 rounded-full ${
+                    index === 0 ? "bg-sky-300" : "bg-indigo-300"
+                  }`}
+                />
+                <span className="font-medium text-slate-100">{item.label}</span>
+              </div>
+              <AnimatedNumber
+                value={item.count / total}
+                formatter={formatPercent}
+                className="tabular-nums text-base font-semibold text-slate-100"
               />
-              <span className="font-medium text-slate-100">{item.label}</span>
-              <span className="ml-auto tabular-nums text-slate-400">
-                {percentFormatter.format(item.count / total)}
-              </span>
-            </p>
+            </div>
           ))}
         </div>
       </div>
@@ -851,9 +1049,11 @@ function StatLine({ label, value }) {
   return (
     <span className="flex items-center gap-2">
       <span className="text-slate-500">{label}</span>
-      <span className="font-semibold text-slate-100">
-        {percentFormatter.format(value)}
-      </span>
+      <AnimatedNumber
+        value={value}
+        formatter={formatPercent}
+        className="font-semibold text-slate-100"
+      />
     </span>
   );
 }
@@ -901,8 +1101,11 @@ function MetricsSection({
           <RadarChart series={radarSeries} />
         </article>
 
-        <article className="rounded-3xl border border-slate-800/60 bg-slate-900/60 p-6">
-          <div className="flex flex-wrap items-start justify-between gap-4">
+        <article className="relative overflow-hidden rounded-3xl border border-white/10 bg-slate-950/85 p-8 shadow-[0_26px_110px_-60px_rgba(59,130,246,0.55)]">
+          <div className="pointer-events-none absolute -right-24 top-0 h-64 w-64 rounded-full bg-sky-500/20 blur-3xl" />
+          <div className="pointer-events-none absolute -left-20 bottom-0 h-56 w-56 rounded-full bg-indigo-500/15 blur-3xl" />
+          <div className="pointer-events-none absolute inset-0 rounded-3xl border border-white/10 opacity-30" />
+          <div className="relative flex flex-wrap items-start justify-between gap-4">
             <div>
               <h3 className="text-lg font-semibold text-slate-50">
                 Ensemble summary rings
@@ -912,7 +1115,7 @@ function MetricsSection({
                 single glance.
               </p>
             </div>
-            <span className="rounded-full border border-slate-800/70 bg-slate-950/70 px-3 py-1 text-xs uppercase tracking-[0.3em] text-slate-500">
+            <span className="rounded-full border border-white/15 bg-white/5 px-4 py-1 text-[0.65rem] uppercase tracking-[0.32em] text-white/60">
               averaged metrics
             </span>
           </div>
@@ -955,8 +1158,8 @@ function MetricsSection({
 }
 
 const RadarChart = ({ series }) => {
-  const size = 360;
-  const margin = 28;
+  const size = 480;
+  const margin = 40;
   const center = size / 2;
   const radius = center - margin;
   const levels = [0.2, 0.4, 0.6, 0.8, 1];
@@ -987,7 +1190,8 @@ const RadarChart = ({ series }) => {
     <div className="mt-6 flex flex-col items-center gap-6">
       <svg
         viewBox={`0 0 ${size} ${size}`}
-        className="h-80 w-80"
+        className="w-full max-w-2xl"
+        style={{ maxHeight: "28rem" }}
         role="img"
         aria-label="Radar chart for average metrics"
       >
@@ -1008,8 +1212,8 @@ const RadarChart = ({ series }) => {
             cy={center}
             r={radius * ratio}
             fill="none"
-            stroke="rgba(148,163,184,0.15)"
-            strokeWidth="1"
+            stroke="rgba(148,163,184,0.16)"
+            strokeWidth="1.2"
           />
         ))}
 
@@ -1039,7 +1243,7 @@ const RadarChart = ({ series }) => {
                 y={labelPoint.y}
                 textAnchor="middle"
                 dominantBaseline="middle"
-                className="fill-slate-400 text-xs font-medium"
+                className="fill-slate-300 text-sm font-medium"
               >
                 {METRIC_LABELS[key]}
               </text>
@@ -1053,7 +1257,7 @@ const RadarChart = ({ series }) => {
               points={polygon.points}
               fill={polygon.fill}
               stroke={polygon.stroke}
-              strokeWidth="2.5"
+              strokeWidth="3"
               filter="url(#radar-glow)"
             />
             {METRIC_KEYS.map((key, metricIndex) => {
@@ -1071,7 +1275,7 @@ const RadarChart = ({ series }) => {
                   key={`${polygon.key}-${key}`}
                   cx={point.x}
                   cy={point.y}
-                  r="4"
+                  r="5"
                   fill={polygon.stroke}
                   filter="url(#radar-glow)"
                 />
@@ -1081,33 +1285,50 @@ const RadarChart = ({ series }) => {
         ))}
       </svg>
 
-      <div className="grid w-full max-w-xl grid-cols-2 gap-4 text-sm text-slate-300">
+      <div className="grid w-full max-w-3xl grid-cols-1 gap-4 text-base text-slate-300 sm:grid-cols-2">
         {polygons.map((polygon) => (
           <div
             key={polygon.key}
-            className="flex flex-col gap-2 rounded-xl border border-slate-800/60 bg-slate-950/60 p-3"
+            className="relative flex flex-col gap-3 overflow-hidden rounded-3xl border border-white/8 bg-slate-950/70 p-5 shadow-[0_22px_80px_-40px_rgba(59,130,246,0.45)]"
           >
-            <div className="flex items-center gap-2">
-              <span
-                className="h-2.5 w-2.5 rounded-full"
-                style={{ backgroundColor: polygon.stroke }}
-              />
-              <span className="font-medium text-slate-100">
-                {polygon.label}
+            <div className="pointer-events-none absolute -right-16 top-1/2 h-40 w-40 -translate-y-1/2 rounded-full bg-sky-500/15 blur-2xl" />
+            <div className="pointer-events-none absolute -left-16 bottom-0 h-32 w-32 rounded-full bg-indigo-500/10 blur-3xl" />
+            <div
+              className="pointer-events-none absolute inset-0 border border-white/5 opacity-40"
+              style={{ borderRadius: "1.5rem" }}
+            />
+            <div className="relative flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <span
+                  className="h-2.5 w-2.5 rounded-full"
+                  style={{ backgroundColor: polygon.stroke }}
+                />
+                <span className="text-lg font-semibold text-slate-50">
+                  {polygon.label}
+                </span>
+              </div>
+              <span className="relative rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs uppercase tracking-[0.32em] text-white/65">
+                composite
               </span>
             </div>
-            <div className="grid grid-cols-2 gap-1 pl-4 text-xs">
+            <div className="relative grid grid-cols-2 gap-2 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-200">
               {METRIC_KEYS.map((key) => (
                 <div
                   key={key}
                   className="flex items-center justify-between gap-2"
                 >
-                  <span className="text-slate-500">{METRIC_LABELS[key]}</span>
-                  <span className="font-medium text-slate-200">
-                    {percentFormatter.format(polygon.metrics?.[key] ?? 0)}
-                  </span>
+                  <span className="text-slate-400">{METRIC_LABELS[key]}</span>
+                  <AnimatedNumber
+                    value={polygon.metrics?.[key] ?? 0}
+                    formatter={formatPercent}
+                    className="text-base font-semibold text-slate-100"
+                  />
                 </div>
               ))}
+            </div>
+            <div className="relative mt-2 flex items-center justify-between text-xs uppercase tracking-[0.28em] text-white/45">
+              <span>signal strength</span>
+              <span className="text-white/60">updated weekly</span>
             </div>
           </div>
         ))}
@@ -1127,116 +1348,106 @@ const ClassMetricHeatmap = ({ metric, modelKeys }) => {
   }, [metric, modelKeys]);
 
   return (
-    <div className="mt-6 overflow-hidden rounded-2xl border border-slate-800/60 bg-slate-950/60">
-      <div className="grid" style={{ gridTemplateColumns: gridTemplate }}>
-        <div className="bg-slate-900/80 px-4 py-4 text-xs uppercase tracking-[0.3em] text-slate-500">
-          Finding
-        </div>
-        {modelKeys.map((key) => (
-          <div
-            key={key}
-            className="bg-slate-900/80 px-4 py-4 text-xs uppercase tracking-[0.3em] text-slate-500"
-          >
-            {MODEL_LIST.find((model) => model.id === key)?.label ?? key}
+    <div className="relative mt-6 overflow-hidden rounded-3xl border border-white/10 bg-slate-950/85 p-4 shadow-[0_24px_90px_-60px_rgba(59,130,246,0.45)]">
+      <div className="pointer-events-none absolute -left-24 top-0 h-64 w-64 rounded-full bg-sky-500/10 blur-3xl" />
+      <div className="pointer-events-none absolute -right-28 bottom-0 h-72 w-72 rounded-full bg-indigo-500/15 blur-3xl" />
+      <div className="pointer-events-none absolute inset-0 rounded-3xl border border-white/10 opacity-30" />
+      <div className="relative overflow-hidden rounded-[1.75rem] border border-white/10 bg-white/5">
+        <div className="grid" style={{ gridTemplateColumns: gridTemplate }}>
+          <div className="bg-white/5 px-5 py-4 text-xs uppercase tracking-[0.32em] text-white/60">
+            Finding
           </div>
-        ))}
-        {classMetrics.map((row, rowIndex) => (
-          <Fragment key={row.label}>
+          {modelKeys.map((key) => (
             <div
-              className={`px-4 py-3 text-sm font-medium text-slate-200 ${
-                rowIndex % 2 === 0 ? "bg-slate-950/50" : "bg-slate-950/70"
-              }`}
+              key={key}
+              className="bg-white/5 px-5 py-4 text-xs uppercase tracking-[0.32em] text-white/60"
             >
-              {row.label}
+              {MODEL_LIST.find((model) => model.id === key)?.label ?? key}
             </div>
-            {modelKeys.map((key, colIndex) => (
-              <MetricCell
-                key={`${row.label}-${key}`}
-                value={row[key]?.[metric] ?? 0}
-                maxValue={maxValue}
-                color={
-                  MODEL_COLORS[key] ?? BAR_COLORS[colIndex % BAR_COLORS.length]
-                }
-                alternate={rowIndex % 2 === 0}
-              />
-            ))}
-          </Fragment>
-        ))}
+          ))}
+          {classMetrics.map((row, rowIndex) => (
+            <Fragment key={row.label}>
+              <div
+                className={`px-5 py-4 text-sm font-medium tracking-wide text-white/80 ${
+                  rowIndex % 2 === 0 ? "bg-slate-950/60" : "bg-slate-950/50"
+                }`}
+              >
+                {row.label}
+              </div>
+              {modelKeys.map((key, colIndex) => (
+                <MetricCell
+                  key={`${row.label}-${key}`}
+                  value={row[key]?.[metric] ?? 0}
+                  maxValue={maxValue}
+                  color={
+                    MODEL_COLORS[key] ??
+                    BAR_COLORS[colIndex % BAR_COLORS.length]
+                  }
+                  alternate={rowIndex % 2 === 0}
+                />
+              ))}
+            </Fragment>
+          ))}
+        </div>
       </div>
     </div>
   );
 };
 
+const getIndicatorColor = (pct, color) => {
+  if (pct >= 0.82) return hexToRgba(color, 0.95);
+  if (pct >= 0.64) return hexToRgba(color, 0.85);
+  if (pct >= 0.42) return hexToRgba(color, 0.75);
+  return hexToRgba(color, 0.55);
+};
+
 const MetricCell = ({ value, maxValue, color, alternate }) => {
   const pct = clamp01(maxValue === 0 ? 0 : value / maxValue);
-  const widthPercent = pct === 0 ? 0 : Math.min(100, Math.max(pct * 100, 8));
-
-  // Enhanced color interpolation for better visual understanding
-  const getColorIntensity = (value) => {
-    if (value >= 0.8) return 1;
-    if (value >= 0.6) return 0.85;
-    if (value >= 0.4) return 0.7;
-    if (value >= 0.2) return 0.5;
-    return 0.3;
-  };
+  const basePercent = pct * 100;
+  const visualPercent = pct === 0 ? 0 : Math.min(Math.max(basePercent, 8), 100);
+  const fillPercent = visualPercent;
+  const indicatorPercent = visualPercent;
+  const indicatorColor = getIndicatorColor(pct, color);
 
   return (
     <div
-      className={`relative overflow-hidden border-l border-slate-800/60 px-4 py-3 text-sm text-slate-300 ${
-        alternate ? "bg-slate-950/40" : "bg-slate-950/60"
+      className={`relative overflow-hidden border-l border-white/10 px-6 py-4 text-sm transition-colors duration-500 ${
+        alternate ? "bg-slate-950/60" : "bg-slate-950/40"
       }`}
     >
-      {pct > 0 && (
-        <>
+      <div className="absolute inset-y-3 left-6 right-6">
+        <div className="relative h-full">
+          <div className="pointer-events-none absolute inset-0 rounded-full border border-white/12 bg-white/5" />
           <div
-            className="pointer-events-none absolute inset-y-2 left-4 rounded-full transition-all duration-300"
+            className="pointer-events-none absolute inset-y-0 left-0 rounded-full transition-all duration-500 ease-out"
             style={{
-              width: `${widthPercent}%`,
-              background: `linear-gradient(90deg, 
-                ${hexToRgba(color, 0.15)}, 
-                ${hexToRgba(color, getColorIntensity(pct))}
-              )`,
+              width: `${fillPercent}%`,
+              opacity: pct === 0 ? 0 : 1,
+              background: `linear-gradient(90deg, ${hexToRgba(
+                color,
+                0.2
+              )} 0%, ${hexToRgba(color, 0.7)} 100%)`,
               boxShadow:
-                pct > 0.7 ? `0 0 15px ${hexToRgba(color, 0.3)}` : "none",
+                pct > 0.6 ? `0 0 32px ${hexToRgba(color, 0.4)}` : "none",
             }}
           />
-          <div
-            className="pointer-events-none absolute inset-y-2 left-4 rounded-full opacity-20"
+          <span
+            className="pointer-events-none absolute top-1/2 h-2.5 w-2.5 -translate-y-1/2 rounded-full transition-all duration-500 ease-out"
             style={{
-              width: `${widthPercent}%`,
-              background: `repeating-linear-gradient(
-                45deg,
-                transparent,
-                transparent 5px,
-                ${hexToRgba(color, 0.1)} 5px,
-                ${hexToRgba(color, 0.1)} 10px
-              )`,
+              left: `calc(${indicatorPercent}% - 8px)`,
+              opacity: pct === 0 ? 0 : 1,
+              background: indicatorColor,
+              boxShadow: `0 0 18px ${hexToRgba(color, 0.6)}`,
             }}
           />
-        </>
-      )}
-      <div className="relative flex items-center justify-between gap-2">
-        <span
-          className={`font-semibold ${
-            pct > 0.7 ? "text-sky-100" : "text-slate-100"
-          }`}
-        >
-          {percentFormatter.format(value)}
-        </span>
-        <div className="flex items-center gap-1">
-          {pct > 0.8 && (
-            <span className="h-1.5 w-1.5 rounded-full bg-sky-400 animate-pulse" />
-          )}
-          <span className="text-xs uppercase tracking-[0.2em] text-slate-500">
-            {pct > 0.8
-              ? "high"
-              : pct > 0.6
-              ? "good"
-              : pct > 0.4
-              ? "mid"
-              : "low"}
-          </span>
         </div>
+      </div>
+      <div className="relative flex items-center justify-end gap-3 pr-1">
+        <AnimatedNumber
+          value={value}
+          formatter={formatPercent}
+          className="text-base font-semibold tracking-tight text-white/75"
+        />
       </div>
     </div>
   );
@@ -1244,73 +1455,153 @@ const MetricCell = ({ value, maxValue, color, alternate }) => {
 
 const AverageRings = ({ modelKeys }) => {
   return (
-    <div className="mt-6 grid gap-6 md:grid-cols-2">
+    <div className="relative mt-8 grid gap-6 md:grid-cols-2">
       {modelKeys.map((key) => {
         const metrics = averageMetrics[key];
         const label =
           MODEL_LIST.find((model) => model.id === key)?.label ?? key;
         const color = MODEL_COLORS[key] ?? BAR_COLORS[0];
 
-        // Calculate overall performance score
         const overallScore = (metrics.accuracy + metrics.f1 + metrics.auc) / 3;
+
         const performanceLevel =
-          overallScore >= 0.85
+          overallScore >= 0.86
             ? "Excellent"
-            : overallScore >= 0.75
+            : overallScore >= 0.76
             ? "Very Good"
-            : overallScore >= 0.65
+            : overallScore >= 0.66
             ? "Good"
-            : overallScore >= 0.55
-            ? "Fair"
-            : "Needs Improvement";
+            : "Developing";
+
+        const performanceAccent =
+          overallScore >= 0.86
+            ? "text-sky-200"
+            : overallScore >= 0.76
+            ? "text-sky-300"
+            : overallScore >= 0.66
+            ? "text-indigo-300"
+            : "text-slate-400";
+
+        const sanitizedKey =
+          `ring-${key}`.replace(/[^a-zA-Z0-9_-]/g, "") || "ring";
+        const cardStyle = {
+          borderRadius: "1.75rem",
+          background: `linear-gradient(135deg, rgba(15,23,42,0.96) 4%, ${hexToRgba(
+            color,
+            0.14
+          )} 52%, rgba(15,23,42,0.92) 100%)`,
+          boxShadow: `0 32px 140px -80px ${hexToRgba(color, 0.68)}`,
+        };
 
         return (
           <div
             key={key}
-            className="flex items-center gap-6 rounded-2xl border border-slate-800/70 bg-slate-950/70 p-6"
+            className="relative overflow-hidden border border-white/10 bg-slate-950/70 p-6"
+            style={cardStyle}
           >
-            <AccuracyRing metrics={metrics} color={color} />
-            <div className="space-y-3 text-sm text-slate-300">
-              <div>
-                <p className="text-base font-semibold text-slate-100">
-                  {label}
-                </p>
-                <p
-                  className={`text-xs font-medium ${
-                    overallScore >= 0.75
-                      ? "text-sky-400"
-                      : overallScore >= 0.65
-                      ? "text-indigo-400"
-                      : "text-slate-400"
-                  }`}
-                >
-                  {performanceLevel}
-                </p>
+            <div
+              className="pointer-events-none absolute -left-20 -top-16 h-40 w-40 rounded-full blur-3xl"
+              style={{ backgroundColor: hexToRgba(color, 0.32) }}
+            />
+            <div
+              className="pointer-events-none absolute -right-16 bottom-0 h-44 w-44 rounded-full blur-3xl"
+              style={{ backgroundColor: hexToRgba(color, 0.24) }}
+            />
+            <div className="pointer-events-none absolute inset-[1.5px] rounded-[1.68rem] border border-white/15 opacity-35" />
+            <div
+              className="pointer-events-none absolute inset-[1.5px] rounded-[1.68rem] bg-linear-to-br from-white/6 via-transparent to-white/0 opacity-60"
+              style={{ mixBlendMode: "screen" }}
+            />
+
+            <div className="relative flex flex-col gap-6">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-base font-semibold text-white">{label}</p>
+                  <p
+                    className={`text-xs font-semibold uppercase ${performanceAccent}`}
+                  >
+                    {performanceLevel}
+                  </p>
+                </div>
+                <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[0.65rem] uppercase tracking-[0.32em] text-white/70">
+                  <AnimatedNumber
+                    value={overallScore}
+                    formatter={formatPercent}
+                    className="font-semibold text-white"
+                  />
+                  <span className="text-white/60">overall</span>
+                </span>
               </div>
-              <div className="grid gap-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400">Accuracy</span>
-                  <span className="font-medium text-slate-100">
-                    {percentFormatter.format(metrics.accuracy)}
-                  </span>
+
+              <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-slate-950/50 p-5 sm:flex sm:items-center sm:gap-7">
+                <div className="pointer-events-none absolute inset-0 rounded-3xl bg-linear-to-br from-white/5 via-transparent to-transparent opacity-60" />
+                <div className="relative mx-auto flex h-36 w-36 items-center justify-center sm:mx-0">
+                  <span
+                    className="pointer-events-none absolute h-32 w-32 rounded-full blur-3xl"
+                    style={{ backgroundColor: hexToRgba(color, 0.28) }}
+                  />
+                  <span
+                    className="pointer-events-none absolute h-24 w-24 rounded-full bg-white/5 blur-xl"
+                    style={{ backgroundColor: hexToRgba(color, 0.18) }}
+                  />
+                  <AccuracyRing
+                    metrics={metrics}
+                    color={color}
+                    id={sanitizedKey}
+                  />
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400">F1 Score</span>
-                  <span className="font-medium text-slate-100">
-                    {percentFormatter.format(metrics.f1)}
-                  </span>
+
+                <div className="mt-6 flex-1 space-y-4 sm:mt-0">
+                  <div className="grid gap-2 text-sm text-slate-200">
+                    <div className="flex items-center justify-between rounded-2xl border border-white/5 bg-white/5 px-4 py-3 backdrop-blur-sm">
+                      <span className="text-slate-400">Accuracy</span>
+                      <AnimatedNumber
+                        value={metrics.accuracy}
+                        formatter={formatPercent}
+                        className="text-base font-semibold text-white"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between rounded-2xl border border-white/5 bg-white/5 px-4 py-3 backdrop-blur-sm">
+                      <span className="text-slate-400">F1 Score</span>
+                      <AnimatedNumber
+                        value={metrics.f1}
+                        formatter={formatPercent}
+                        className="text-base font-semibold text-white"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between rounded-2xl border border-white/5 bg-white/5 px-4 py-3 backdrop-blur-sm">
+                      <span className="text-slate-400">AUC</span>
+                      <AnimatedNumber
+                        value={metrics.auc}
+                        formatter={formatPercent}
+                        className="text-base font-semibold text-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-[0.7rem] uppercase tracking-[0.28em] text-white/60">
+                    <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 backdrop-blur-sm">
+                      Prec:
+                      <span className="text-white/80">
+                        <AnimatedNumber
+                          value={metrics.precision}
+                          formatter={formatPercent}
+                          as={Fragment}
+                        />
+                      </span>
+                    </span>
+                    <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 backdrop-blur-sm">
+                      Rec:
+                      <span className="text-white/80">
+                        <AnimatedNumber
+                          value={metrics.recall}
+                          formatter={formatPercent}
+                          as={Fragment}
+                        />
+                      </span>
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400">AUC</span>
-                  <span className="font-medium text-slate-100">
-                    {percentFormatter.format(metrics.auc)}
-                  </span>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 text-xs text-slate-400">
-                <span>P: {percentFormatter.format(metrics.precision)}</span>
-                <span>•</span>
-                <span>R: {percentFormatter.format(metrics.recall)}</span>
               </div>
             </div>
           </div>
@@ -1320,110 +1611,188 @@ const AverageRings = ({ modelKeys }) => {
   );
 };
 
-const AccuracyRing = ({ metrics, color }) => {
-  const radius = 44;
-  const circumference = 2 * Math.PI * radius;
+const AccuracyRing = ({ metrics, color, id }) => {
+  const sanitizedId =
+    (id ?? "ring").toString().replace(/[^a-zA-Z0-9_-]/g, "") || "ring";
 
-  const accuracyDash = clamp01(metrics.accuracy) * circumference;
-  const precisionDash = clamp01(metrics.precision) * circumference;
-  const recallDash = clamp01(metrics.recall) * circumference;
+  const outerRadius = 46;
+  const middleRadius = 32;
+  const innerRadius = 22;
+
+  const outerCircumference = 2 * Math.PI * outerRadius;
+  const middleCircumference = 2 * Math.PI * middleRadius;
+  const innerCircumference = 2 * Math.PI * innerRadius;
+
+  const accuracy = clamp01(metrics?.accuracy);
+  const precision = clamp01(metrics?.precision);
+  const recall = clamp01(metrics?.recall);
+
+  const accuracyDash = accuracy * outerCircumference;
+  const precisionDash = precision * middleCircumference;
+  const recallDash = recall * innerCircumference;
+
+  const offsetOuter = outerCircumference * 0.25;
+  const offsetMiddle = middleCircumference * 0.25;
+  const offsetInner = innerCircumference * 0.25;
+
+  const progressToAngle = (pct) => ((pct * 360 - 90) * Math.PI) / 180;
+  const accuracyMarker = polarToCartesian(
+    60,
+    60,
+    outerRadius,
+    progressToAngle(accuracy)
+  );
+
+  const glowId = `${sanitizedId}-glow`;
+  const accuracyGradientId = `${sanitizedId}-accuracy-gradient`;
+  const precisionGradientId = `${sanitizedId}-precision-gradient`;
+  const recallGradientId = `${sanitizedId}-recall-gradient`;
+  const trackGradientId = `${sanitizedId}-track-gradient`;
+  const coreGradientId = `${sanitizedId}-core-gradient`;
 
   return (
     <svg viewBox="0 0 120 120" className="h-28 w-28">
       <defs>
-        <filter id="glow">
-          <feGaussianBlur stdDeviation="2" result="coloredBlur" />
+        <filter id={glowId}>
+          <feGaussianBlur stdDeviation="3" result="coloredBlur" />
           <feMerge>
             <feMergeNode in="coloredBlur" />
             <feMergeNode in="SourceGraphic" />
           </feMerge>
         </filter>
+        <linearGradient id={trackGradientId} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="rgba(148,163,184,0.18)" />
+          <stop offset="100%" stopColor="rgba(15,23,42,0.55)" />
+        </linearGradient>
+        <linearGradient id={accuracyGradientId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={hexToRgba(color, 0.18)} />
+          <stop offset="55%" stopColor={hexToRgba(color, 0.85)} />
+          <stop offset="100%" stopColor={hexToRgba(color, 0.95)} />
+        </linearGradient>
+        <linearGradient id={precisionGradientId} x1="0" y1="1" x2="1" y2="0">
+          <stop offset="0%" stopColor={hexToRgba(color, 0.12)} />
+          <stop offset="55%" stopColor={hexToRgba(color, 0.7)} />
+          <stop offset="100%" stopColor={hexToRgba(color, 0.82)} />
+        </linearGradient>
+        <linearGradient id={recallGradientId} x1="1" y1="1" x2="0" y2="0">
+          <stop offset="0%" stopColor={hexToRgba(color, 0.1)} />
+          <stop offset="60%" stopColor={hexToRgba(color, 0.55)} />
+          <stop offset="100%" stopColor={hexToRgba(color, 0.75)} />
+        </linearGradient>
+        <radialGradient id={coreGradientId} cx="50%" cy="50%" r="65%">
+          <stop offset="0%" stopColor={hexToRgba(color, 0.22)} />
+          <stop offset="70%" stopColor={hexToRgba(color, 0.08)} />
+          <stop offset="100%" stopColor={hexToRgba(color, 0)} />
+        </radialGradient>
       </defs>
 
-      {/* Background rings */}
       <circle
         cx="60"
         cy="60"
-        r={radius}
+        r={outerRadius}
         fill="none"
-        stroke="rgba(148,163,184,0.12)"
+        stroke={`url(#${trackGradientId})`}
         strokeWidth="12"
       />
       <circle
         cx="60"
         cy="60"
-        r={radius - 14}
+        r={middleRadius}
         fill="none"
-        stroke="rgba(148,163,184,0.08)"
+        stroke="rgba(148,163,184,0.14)"
         strokeWidth="8"
       />
       <circle
         cx="60"
         cy="60"
-        r={radius - 26}
+        r={innerRadius}
         fill="none"
-        stroke="rgba(148,163,184,0.06)"
+        stroke="rgba(148,163,184,0.1)"
         strokeWidth="6"
       />
 
-      {/* Metric rings */}
       <circle
         cx="60"
         cy="60"
-        r={radius}
+        r={outerRadius}
         fill="none"
-        stroke={`${color}cc`}
+        stroke={`url(#${accuracyGradientId})`}
         strokeWidth="12"
-        strokeDasharray={`${accuracyDash} ${circumference}`}
-        strokeDashoffset={circumference * 0.25}
+        strokeDasharray={`${accuracyDash} ${outerCircumference}`}
+        strokeDashoffset={offsetOuter}
         strokeLinecap="round"
-        filter="url(#glow)"
+        filter={`url(#${glowId})`}
       />
       <circle
         cx="60"
         cy="60"
-        r={radius - 14}
+        r={middleRadius}
         fill="none"
-        stroke={`${color}99`}
+        stroke={`url(#${precisionGradientId})`}
         strokeWidth="8"
-        strokeDasharray={`${precisionDash} ${circumference}`}
-        strokeDashoffset={circumference * 0.25}
+        strokeDasharray={`${precisionDash} ${middleCircumference}`}
+        strokeDashoffset={offsetMiddle}
         strokeLinecap="round"
       />
       <circle
         cx="60"
         cy="60"
-        r={radius - 26}
+        r={innerRadius}
         fill="none"
-        stroke={`${color}77`}
+        stroke={`url(#${recallGradientId})`}
         strokeWidth="6"
-        strokeDasharray={`${recallDash} ${circumference}`}
-        strokeDashoffset={circumference * 0.25}
+        strokeDasharray={`${recallDash} ${innerCircumference}`}
+        strokeDashoffset={offsetInner}
         strokeLinecap="round"
       />
 
-      {/* Center content */}
+      {accuracy > 0 ? (
+        <>
+          <circle
+            cx={accuracyMarker.x}
+            cy={accuracyMarker.y}
+            r="3.5"
+            fill={hexToRgba(color, 0.95)}
+            stroke="rgba(15,23,42,0.6)"
+            strokeWidth="1"
+            filter={`url(#${glowId})`}
+          />
+          <circle
+            cx={accuracyMarker.x}
+            cy={accuracyMarker.y}
+            r="8"
+            fill="none"
+            stroke={hexToRgba(color, 0.28)}
+            strokeWidth="1"
+          />
+        </>
+      ) : null}
+
       <circle
         cx="60"
         cy="60"
         r="28"
-        fill={`${color}11`}
-        stroke={`${color}22`}
+        fill={`url(#${coreGradientId})`}
+        stroke={hexToRgba(color, 0.24)}
         strokeWidth="1"
       />
       <text
         x="60"
-        y="55"
+        y="56"
         textAnchor="middle"
-        className="fill-slate-100 text-lg font-semibold"
+        className="fill-slate-50 text-lg font-semibold"
       >
-        {percentFormatter.format(metrics.accuracy)}
+        <AnimatedNumber
+          value={metrics?.accuracy ?? 0}
+          formatter={formatPercent}
+          as={Fragment}
+        />
       </text>
       <text
         x="60"
-        y="70"
+        y="72"
         textAnchor="middle"
-        className="fill-slate-400 text-[10px] font-medium uppercase tracking-wider"
+        className="fill-slate-400 text-[10px] font-medium uppercase tracking-[0.32em]"
       >
         accuracy
       </text>
@@ -1432,18 +1801,20 @@ const AccuracyRing = ({ metrics, color }) => {
 };
 
 // Constants
-const BAR_COLORS = [
-  "#0ea5e9", // Sky blue
-  "#6366f1", // Indigo
-  "#8b5cf6", // Violet
-  "#ec4899", // Pink
-  "#f43f5e", // Rose
-  "#f97316", // Orange
+const BAR_GRADIENTS = [
+  { highlight: "#67e8f9", mid: "#0ea5e9", shadow: "#0f172a" },
+  { highlight: "#5eead4", mid: "#14b8a6", shadow: "#042f2e" },
+  { highlight: "#7dd3fc", mid: "#38bdf8", shadow: "#0b1f3a" },
+  { highlight: "#60efff", mid: "#0891b2", shadow: "#06283d" },
+  { highlight: "#6ee7b7", mid: "#0f766e", shadow: "#03211f" },
+  { highlight: "#5de0ff", mid: "#2563eb", shadow: "#082f49" },
 ];
 
+const BAR_COLORS = BAR_GRADIENTS.map((palette) => palette.mid);
+
 const MODEL_COLORS = {
-  densenet121: "#0ea5e9", // Sky blue for better visibility
-  resnet152: "#6366f1", // Indigo for clear distinction
+  densenet121: BAR_GRADIENTS[0].mid,
+  resnet152: BAR_GRADIENTS[5].mid,
 };
 
 // Export component

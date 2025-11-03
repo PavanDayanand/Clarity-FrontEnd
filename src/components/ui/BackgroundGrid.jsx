@@ -1,5 +1,5 @@
-function BackgroundGrid({ className = "", cellSize = 120 }) {
-  const lineColor = "rgba(148, 163, 184, 0.12)";
+function BackgroundGrid({ className = "", cellSize = 120, opacity = 0.12 }) {
+  const lineColor = `rgba(148, 163, 184, ${opacity})`;
   const size = typeof cellSize === "number" ? `${cellSize}px` : cellSize;
   const classes = ["pointer-events-none absolute inset-0", className]
     .filter(Boolean)
