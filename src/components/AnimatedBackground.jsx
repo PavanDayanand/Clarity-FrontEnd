@@ -89,6 +89,26 @@ const bubblePresets = {
       color: "rgba(86, 174, 255, 0.12)",
     },
   ],
+  data: [
+    {
+      top: "-20rem",
+      left: "-26rem",
+      size: "44rem",
+      color: "rgba(52, 116, 255, 0.22)",
+    },
+    {
+      bottom: "-28rem",
+      right: "-24rem",
+      size: "40rem",
+      color: "rgba(24, 82, 214, 0.18)",
+    },
+    {
+      top: "46%",
+      right: "-14rem",
+      size: "28rem",
+      color: "rgba(84, 140, 255, 0.14)",
+    },
+  ],
 };
 
 export default function AnimatedBackground({ tone = "default" }) {

@@ -80,6 +80,37 @@ const BACKDROP_VARIANTS = {
       style: { width: "44rem", height: "44rem" },
     },
   },
+  data: {
+    outerClass: "opacity-95",
+    topGradient:
+      "bg-[radial-gradient(circle_at_top,rgba(34,96,255,0.52),rgba(4,10,24,0.98))]",
+    bottomGradient:
+      "bg-[radial-gradient(circle_at_bottom,rgba(5,14,34,0.94),#01040c)]",
+    leftGlow: {
+      className:
+        "absolute -top-44 -left-28 rounded-full bg-linear-to-br from-[#2b7bff]/80 via-[#3b5bff]/55 to-transparent blur-3xl opacity-80",
+      style: { width: "36rem", height: "36rem" },
+    },
+    rightGlow: {
+      className:
+        "absolute bottom-0 -right-52 rounded-full bg-linear-to-tl from-[#061d5d]/85 via-[#132b7d]/65 to-transparent blur-3xl opacity-90",
+      style: { width: "48rem", height: "48rem" },
+    },
+    extras: [
+      {
+        className:
+          "absolute inset-x-20 top-1/4 h-px bg-linear-to-r from-transparent via-white/12 to-transparent",
+      },
+      {
+        className:
+          "absolute inset-x-24 bottom-24 h-px bg-linear-to-r from-transparent via-cyan-200/20 to-transparent",
+      },
+      {
+        className:
+          "absolute inset-0 bg-linear-to-t from-black/80 via-black/40 to-transparent",
+      },
+    ],
+  },
 };
 
 function PageBackdrop({ variant = "predict", className = "" }) {

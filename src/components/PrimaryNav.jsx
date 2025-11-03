@@ -6,6 +6,7 @@ const iconBackgrounds = {
   predict: "from-cyan-400/35 via-sky-500/20 to-sky-400/10",
   gradcam: "from-violet-400/35 via-indigo-500/20 to-indigo-400/10",
   report: "from-emerald-400/35 via-teal-500/20 to-cyan-400/10",
+  data: "from-sky-400/35 via-blue-500/20 to-indigo-400/10",
 };
 
 const renderFeatureIcon = (key, className = "h-5 w-5 text-white") => {
@@ -79,6 +80,37 @@ const renderFeatureIcon = (key, className = "h-5 w-5 text-white") => {
           <path strokeLinecap="round" strokeLinejoin="round" d="M9 15.5h3.5" />
         </svg>
       );
+    case "data":
+      return (
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          className={className}
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M4.75 18V8.5c0-.83.67-1.5 1.5-1.5H8"
+          />
+          <path
+            fill="currentColor"
+            fillOpacity="0.55"
+            d="M9.25 6.5h2.5c.55 0 1 .45 1 1v9c0 .55-.45 1-1 1h-2.5c-.55 0-1-.45-1-1v-9c0-.55.45-1 1-1Z"
+          />
+          <path
+            fill="currentColor"
+            fillOpacity="0.4"
+            d="M14.25 9h2.5c.55 0 1 .45 1 1v6.5c0 .55-.45 1-1 1h-2.5c-.55 0-1-.45-1-1V10c0-.55.45-1 1-1Z"
+          />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M4.75 18h14.5"
+          />
+        </svg>
+      );
     default:
       return null;
   }
@@ -88,6 +120,7 @@ export default function PrimaryNav({
   onNavigate,
   homePath = "/",
   aboutPath = "/#about",
+  dataPath = "/data",
   maxWidthClass = "max-w-6xl",
 }) {
   const [featuresOpen, setFeaturesOpen] = useState(false);
@@ -214,6 +247,14 @@ export default function PrimaryNav({
                 </motion.svg>
               </motion.button>
             </div>
+
+            <a
+              href={dataPath}
+              onClick={(event) => handleNavigate(event, dataPath)}
+              className="cursor-pointer rounded-full px-6 py-2 text-base font-semibold text-white/75 transition-colors hover:text-white"
+            >
+              Data
+            </a>
 
             <a
               href={aboutPath}
@@ -370,8 +411,16 @@ export default function PrimaryNav({
 
             <button
               type="button"
-              onClick={(event) => handleNavigate(event, aboutPath)}
+              onClick={(event) => handleNavigate(event, dataPath)}
               className="mt-5 w-full cursor-pointer rounded-full px-5 py-3 text-sm font-medium text-white/75 transition-colors hover:text-white"
+            >
+              Data
+            </button>
+
+            <button
+              type="button"
+              onClick={(event) => handleNavigate(event, aboutPath)}
+              className="mt-3 w-full cursor-pointer rounded-full px-5 py-3 text-sm font-medium text-white/75 transition-colors hover:text-white"
             >
               About
             </button>
