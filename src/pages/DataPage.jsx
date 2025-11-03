@@ -1121,14 +1121,20 @@ function MetricsSection({
       </header>
 
       <div className="grid gap-8 lg:grid-cols-[2fr,3fr]">
-        <article className="rounded-3xl border border-slate-800/60 bg-slate-900/60 p-6">
-          <h3 className="text-lg font-semibold text-slate-50">
-            Average metric radar
-          </h3>
-          <p className="text-sm text-slate-400">
-            Scores normalised across accuracy, AUC, F1, precision, and recall.
-          </p>
-          <RadarChart series={radarSeries} />
+        <article className="relative overflow-hidden rounded-3xl border border-white/10 bg-slate-950/85 p-6 shadow-[0_26px_110px_-65px_rgba(37,99,235,0.45)]">
+          <div className="pointer-events-none absolute -left-32 top-0 h-56 w-56 rounded-full bg-sky-500/15 blur-3xl" />
+          <div className="pointer-events-none absolute -right-28 bottom-0 h-60 w-60 rounded-full bg-indigo-500/12 blur-3xl" />
+          <div className="pointer-events-none absolute inset-0 rounded-3xl border border-white/10 opacity-25" />
+          <div className="pointer-events-none absolute inset-0 rounded-3xl bg-linear-to-br from-white/5 via-transparent to-transparent opacity-55" />
+          <div className="relative">
+            <h3 className="text-lg font-semibold text-slate-50">
+              Average metric radar
+            </h3>
+            <p className="text-sm text-slate-400">
+              Scores normalised across accuracy, AUC, F1, precision, and recall.
+            </p>
+            <RadarChart series={radarSeries} />
+          </div>
         </article>
 
         <article className="relative overflow-hidden rounded-3xl border border-white/10 bg-slate-950/85 p-8 shadow-[0_26px_110px_-60px_rgba(59,130,246,0.55)]">
@@ -1233,7 +1239,46 @@ const RadarChart = ({ series }) => {
               <feMergeNode in="SourceGraphic" />
             </feMerge>
           </filter>
+          <radialGradient
+            id="radar-background-gradient"
+            cx="50%"
+            cy="48%"
+            r="72%"
+          >
+            <stop offset="0%" stopColor="rgba(59,130,246,0.32)" />
+            <stop offset="45%" stopColor="rgba(30,64,175,0.22)" />
+            <stop offset="100%" stopColor="rgba(7,16,32,0.95)" />
+          </radialGradient>
+          <linearGradient id="radar-rim-gradient" x1="0" x2="1" y1="0" y2="1">
+            <stop offset="0%" stopColor="rgba(148,163,184,0.22)" />
+            <stop offset="65%" stopColor="rgba(59,130,246,0.16)" />
+            <stop offset="100%" stopColor="rgba(15,23,42,0.6)" />
+          </linearGradient>
+          <radialGradient id="radar-accent-gradient" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="rgba(96,165,250,0.85)" />
+            <stop offset="55%" stopColor="rgba(59,130,246,0.35)" />
+            <stop offset="100%" stopColor="rgba(15,23,42,0)" />
+          </radialGradient>
         </defs>
+
+        <rect
+          x={margin * 0.6}
+          y={margin * 0.6}
+          width={size - margin * 1.2}
+          height={size - margin * 1.2}
+          rx={48}
+          fill="url(#radar-background-gradient)"
+          stroke="url(#radar-rim-gradient)"
+          strokeWidth="1.5"
+        />
+
+        <circle
+          cx={size - margin * 1.9}
+          cy={size - margin * 1.6}
+          r={44}
+          fill="url(#radar-accent-gradient)"
+          opacity="0.55"
+        />
 
         {levels.map((ratio) => (
           <circle

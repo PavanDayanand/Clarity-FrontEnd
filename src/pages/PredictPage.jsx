@@ -980,10 +980,6 @@ function PredictPage() {
     );
   };
 
-  const handleReload = () => {
-    triggerNavigation(() => window.location.reload());
-  };
-
   const handleModelSelect = useCallback(
     (modelId) => {
       if (activeModelId === modelId) {
@@ -2172,23 +2168,6 @@ function PredictPage() {
               <span className={buttonDotClasses} />
             </motion.button>
           </motion.section>
-
-          <motion.div
-            {...revealProps}
-            custom={0.6}
-            className="mt-6 flex justify-center px-6 sm:px-12"
-          >
-            <button
-              type="button"
-              onClick={handleReload}
-              className="group inline-flex items-center gap-3 rounded-full border border-white/12 bg-white/10 px-5 py-2 text-sm font-medium text-white/80 backdrop-blur-2xl shadow-[0_18px_45px_-30px_rgba(37,99,235,0.8)] transition hover:border-white/20 hover:bg-white/15 hover:text-white"
-            >
-              <span className="inline-flex items-center rounded-full bg-[#1553f5] px-3 py-1 text-xs font-semibold text-white shadow-[0_10px_30px_-18px_rgba(32,92,255,0.95)] transition group-hover:bg-[#1f61ff]">
-                ↻ Reload
-              </span>
-              <span className="pr-1">Stay on latest data</span>
-            </button>
-          </motion.div>
         </main>
       </div>
 

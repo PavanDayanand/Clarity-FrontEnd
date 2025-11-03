@@ -120,9 +120,7 @@ export default function CustomCursor() {
             width: 6,
             height: 6,
             borderRadius: "50%",
-            backgroundColor: "rgba(224,242,254,0.85)",
-            boxShadow:
-              "0 0 22px rgba(191,219,254,0.55), 0 0 48px rgba(96,165,250,0.28)",
+            backgroundColor: "rgba(226,232,240,0.95)",
           }}
         />
       </div>
@@ -140,41 +138,21 @@ export default function CustomCursor() {
             width: pressed ? 34 : 38,
             height: pressed ? 34 : 38,
             borderRadius: "50%",
-            border: "1.6px solid rgba(125,211,252,0.28)",
-            background:
-              "radial-gradient(circle, rgba(125,211,252,0.16) 0%, rgba(30,64,175,0.08) 46%, rgba(7,17,36,0) 78%)",
+            border: "1.4px solid rgba(148,163,184,0.45)",
+            backgroundColor: "rgba(15,23,42,0.35)",
             transition:
               "transform 0.18s ease, width 0.18s ease, height 0.18s ease",
-            filter: "blur(0.2px)",
-            boxShadow:
-              "0 0 28px rgba(56,189,248,0.25), 0 0 110px rgba(14,165,233,0.28)",
-            mixBlendMode: "screen",
+            filter: "none",
           }}
         >
-          <span
-            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
-            style={{
-              width: pressed ? 118 : 132,
-              height: pressed ? 118 : 132,
-              borderRadius: "50%",
-              background:
-                "radial-gradient(circle, rgba(14,165,233,0.14) 0%, rgba(59,130,246,0.1) 40%, rgba(7,14,35,0) 82%)",
-              filter: "blur(18px)",
-              opacity: 0.65,
-              transition:
-                "width 0.2s ease, height 0.2s ease, opacity 0.2s ease",
-            }}
-          />
           <span
             className="absolute left-1/2 top-1/2"
             style={{
               width: pressed ? 10 : 12,
               height: pressed ? 10 : 12,
               borderRadius: "50%",
-              backgroundColor: "#3ba4ff",
+              backgroundColor: "rgba(226,232,240,0.9)",
               transform: "translate(-50%, -50%)",
-              boxShadow:
-                "0 0 12px rgba(59,164,255,0.48), 0 0 38px rgba(34,211,238,0.45)",
               transition: "width 0.18s ease, height 0.18s ease",
             }}
           />

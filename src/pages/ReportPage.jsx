@@ -1297,12 +1297,12 @@ function ReportPage() {
             transition={{ ...smoothTransition, delay: 0.22 }}
             className="pointer-events-none absolute -left-24 top-60 hidden xl:block"
           >
-            <div className="relative h-88 w-64 -rotate-6 rounded-[42px] border border-white/10 bg-white/5 p-3 shadow-[0_40px_120px_-60px_rgba(12,74,185,0.65)] backdrop-blur-3xl">
+            <div className="relative h-88 w-64 -rotate-6 rounded-[42px] bg-white/5 p-3 shadow-[0_40px_120px_-60px_rgba(12,74,185,0.65)] backdrop-blur-3xl">
               <div className="absolute -left-16 top-1/2 h-40 w-40 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(59,130,246,0.3),transparent_70%)] blur-3xl" />
               <img
                 src={leftFeatureImage}
                 alt="Radiology artifacts floating beside the report preview"
-                className="relative z-10 h-full w-full rounded-[28px] border border-white/15 object-cover"
+                className="relative z-10 h-full w-full rounded-[28px] object-cover"
                 style={{
                   maskImage:
                     "radial-gradient(circle at center, rgba(0,0,0,1) 68%, rgba(0,0,0,0) 96%)",
@@ -1314,7 +1314,6 @@ function ReportPage() {
                   WebkitMaskRepeat: "no-repeat",
                 }}
               />
-              <span className="pointer-events-none absolute inset-0 rounded-[inherit] border border-white/8" />
               <span className="pointer-events-none absolute -bottom-10 right-8 text-xs font-semibold uppercase tracking-[0.28em] text-cyan-200/70">
                 imaging
               </span>
@@ -1326,12 +1325,12 @@ function ReportPage() {
             transition={{ ...smoothTransition, delay: 0.28 }}
             className="pointer-events-none absolute -right-24 top-96 hidden xl:block"
           >
-            <div className="relative h-96 w-68 rotate-6 rounded-[42px] border border-white/10 bg-[#120d1c]/70 p-3 shadow-[0_40px_130px_-60px_rgba(244,114,182,0.6)] backdrop-blur-3xl">
+            <div className="relative h-96 w-68 rotate-6 rounded-[42px] bg-[#120d1c]/70 p-3 shadow-[0_40px_130px_-60px_rgba(244,114,182,0.6)] backdrop-blur-3xl">
               <div className="absolute -right-14 top-1/2 h-36 w-36 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(255,138,101,0.32),transparent_72%)] blur-3xl" />
               <img
                 src={rightFeatureImage}
                 alt="Chest vessel scan emphasising the report context"
-                className="relative z-10 h-full w-full rounded-[28px] border border-white/12 object-cover"
+                className="relative z-10 h-full w-full rounded-[28px] object-cover"
                 style={{
                   maskImage:
                     "radial-gradient(circle at center, rgba(0,0,0,1) 66%, rgba(0,0,0,0) 96%)",
@@ -1343,7 +1342,6 @@ function ReportPage() {
                   WebkitMaskRepeat: "no-repeat",
                 }}
               />
-              <span className="pointer-events-none absolute inset-0 rounded-[inherit] border border-white/10" />
               <span className="pointer-events-none absolute -top-10 left-6 text-xs font-semibold uppercase tracking-[0.28em] text-sky-200/70">
                 heat map
               </span>
