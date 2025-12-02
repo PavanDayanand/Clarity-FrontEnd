@@ -23,7 +23,11 @@ import Footer from "./components/Footer.jsx";
 import ScrollIndicator from "./components/ui/ScrollIndicator.jsx";
 import BackgroundGrid from "./components/ui/BackgroundGrid.jsx";
 import { usePopup } from "./components/ui/PopupProvider.jsx";
+import PageBackdrop from "./components/ui/PageBackdrop.jsx";
 import { useUpload } from "./context/UploadContext.jsx";
+import MagneticButton from "./components/ui/MagneticButton.jsx";
+import NoiseOverlay from "./components/ui/NoiseOverlay.jsx";
+import SmoothScroll from "./components/ui/SmoothScroll.jsx";
 const renderRegionIcon = (type, className = "h-5 w-5") => {
   switch (type) {
     case "india":
@@ -1282,908 +1286,929 @@ function App() {
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#010718] text-white">
-      <ScrollIndicator />
+    <SmoothScroll>
+      <div className="relative min-h-screen overflow-hidden bg-[#031029] text-white">
+        <ScrollIndicator className="right-3 sm:right-5 md:right-7 lg:right-12" />
+        <PageBackdrop />
+        <BackgroundGrid className="z-10 opacity-20" />
 
-      <AnimatePresence>
-        {isLoaderActive ? (
-          <motion.div
-            key="clarity-loader"
-            className="fixed inset-0 z-50 flex items-center justify-center bg-[#02061f]/80 backdrop-blur-[10px]"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+        <AnimatePresence>
+          {isLoaderActive ? (
+            <motion.div
+              key="clarity-loader"
+              className="fixed inset-0 z-50 flex items-center justify-center bg-[#02061f]/80 backdrop-blur-[10px]"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <motion.div
+                className="relative w-[min(460px,92vw)] overflow-hidden rounded-4xl border border-white/12 bg-[linear-gradient(140deg,rgba(24,54,147,0.97),rgba(8,18,56,0.97))] p-8 text-left shadow-[0_48px_160px_-60px_rgba(35,108,255,0.9)]"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.94 }}
+                transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+              >
+                <div className="pointer-events-none absolute inset-0 opacity-80">
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(94,149,255,0.6),transparent_60%)]" />
+                  <div className="absolute -bottom-28 -left-20 h-64 w-64 rounded-full bg-[rgba(64,120,255,0.28)] blur-3xl" />
+                  <div className="absolute -top-20 right-10 h-40 w-40 rounded-full bg-[rgba(109,160,255,0.32)] blur-[90px]" />
+                </div>
+                <div className="relative z-10">
+                  <div className="flex items-center gap-2 text-[0.65rem] font-semibold uppercase tracking-[0.48em] text-sky-100/85">
+                    <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/12 text-sky-200">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        className="h-4 w-4"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M12 3v6l3-3m-3 3-3-3"
+                        />
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M7.5 13a4.5 4.5 0 0 0 9 0c0-1.657 1.343-3 3-3"
+                        />
+                      </svg>
+                    </span>
+                    {loaderHeadline}
+                  </div>
+                  <div className="mt-6 flex items-baseline gap-6">
+                    <span className="text-6xl font-semibold text-white drop-shadow-[0_12px_35px_rgba(23,78,203,0.35)]">
+                      {loaderProgress}
+                      <span className="text-2xl align-super">%</span>
+                    </span>
+                    <span className="flex items-center gap-2 text-sm text-sky-100/85">
+                      <span className="inline-flex h-1.5 w-1.5 rounded-full bg-sky-200/80" />
+                      {loaderStatusText}
+                    </span>
+                  </div>
+                  <div className="mt-7">
+                    <div className="relative h-14 overflow-hidden rounded-3xl border border-white/15 bg-white/10 backdrop-blur-[2px]">
+                      <motion.div
+                        className="absolute inset-y-1 left-1 flex items-center justify-end rounded-2xl bg-[linear-gradient(115deg,#e8f1ff,#a7c5ff,#6f97ff)] text-sm font-semibold text-[#16316f] shadow-[0_10px_55px_-30px_rgba(129,178,255,0.9)]"
+                        animate={{ width: `${Math.max(loaderProgress, 8)}%` }}
+                        transition={{
+                          duration: 0.35,
+                          ease: [0.22, 1, 0.36, 1],
+                        }}
+                        style={{ minWidth: "4.5rem" }}
+                      >
+                        <span className="pr-4">{loaderProgress}%</span>
+                      </motion.div>
+                      <div className="pointer-events-none absolute inset-0 rounded-3xl bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.18),transparent_70%)]" />
+                    </div>
+                    <div className="mt-3 flex justify-between text-[0.65rem] font-semibold tracking-[0.36em] text-sky-100/60">
+                      <span>0</span>
+                      <span>50</span>
+                      <span>100</span>
+                    </div>
+                  </div>
+                  <div className="mt-7 flex items-center gap-3 text-sm text-sky-100/90">
+                    <span className="inline-flex h-3 w-3 animate-pulse rounded-full bg-sky-300 shadow-[0_0_15px_rgba(125,162,255,0.9)]" />
+                    {loaderMessage}
+                  </div>
+                  <div className="mt-6 flex items-center gap-3 text-[0.7rem] uppercase tracking-[0.4em] text-sky-100/45">
+                    <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-white/20">
+                      <span className="h-3 w-3 animate-spin rounded-full border-2 border-white/20 border-t-white/70" />
+                    </span>
+                    {loaderFooterText}
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
+
+        <div className="pointer-events-none absolute inset-0 opacity-95">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(8,40,90,0.7),rgba(1,6,18,1))]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom,rgba(1,10,26,0.95),#01030d)]" />
+          <div
+            className="absolute -top-44 -left-32 rounded-full bg-linear-to-br from-[#0f2560]/75 via-[#1b3d7a]/60 to-transparent blur-[140px] opacity-90"
+            style={{ width: "34rem", height: "34rem" }}
+          />
+          <div
+            className="absolute bottom-0 -right-48 rounded-full bg-linear-to-tl from-[#07163a]/85 via-[#102552]/65 to-transparent blur-[160px] opacity-95"
+            style={{ width: "46rem", height: "46rem" }}
+          />
+          <div className="absolute top-1/3 right-1/3 h-60 w-60 rounded-full bg-white/8 blur-3xl opacity-35 mix-blend-screen" />
+        </div>
+
+        <motion.div
+          className="pointer-events-none absolute inset-0 z-20 backdrop-blur-[1.5px]"
+          style={entryOverlayStyle}
+          initial={{ opacity: 0.45 }}
+          animate={{ opacity: 0 }}
+          transition={{ duration: 0.65, ease: [0.16, 1, 0.3, 1] }}
+        />
+
+        <NoiseOverlay opacity={0.04} />
+
+        {/* Aurora Glow Background */}
+        <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+          <div className="absolute -top-[20%] left-1/2 h-[80vh] w-[80vw] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(14,165,233,0.15),transparent_70%)] blur-[100px]" />
+          <div
+            className="absolute top-[10%] left-[20%] h-[40vh] w-[40vw] rounded-full bg-[radial-gradient(circle,rgba(99,102,241,0.12),transparent_70%)] blur-[80px] animate-pulse"
+            style={{ animationDuration: "8s" }}
+          />
+          <div
+            className="absolute top-[15%] right-[20%] h-[35vh] w-[35vw] rounded-full bg-[radial-gradient(circle,rgba(56,189,248,0.12),transparent_70%)] blur-[80px] animate-pulse"
+            style={{ animationDuration: "10s" }}
+          />
+        </div>
+
+        <div className="relative z-10 flex min-h-screen flex-col px-4 pb-24 pt-10 sm:px-8">
+          <header className="px-6 pt-8 sm:px-10">
+            <PrimaryNav
+              onNavigate={handlePrimaryNavigation}
+              maxWidthClass="max-w-5xl"
+            />
+          </header>
+
+          <section
+            id="home"
+            className="relative px-6 pt-12 text-center sm:px-12"
+          >
+            <motion.img
+              initial={{ opacity: 0, y: 40, rotate: -4 }}
+              animate={{ opacity: 0.8, y: 0, rotate: -1.5 }}
+              transition={{ duration: 1.1, ease: [0.22, 1, 0.36, 1] }}
+              src="/Chest%20X-ray%20Label%20250.jpg"
+              alt="Annotated lateral chest X-ray highlighting key structures"
+              className="pointer-events-none absolute hidden left-8 top-28 w-56 max-w-full select-none opacity-70 lg:block xl:left-16 xl:top-20 xl:w-64"
+              style={{
+                WebkitMaskImage:
+                  "radial-gradient(circle at center, rgba(0,0,0,1) 58%, rgba(0,0,0,0) 92%)",
+                maskImage:
+                  "radial-gradient(circle at center, rgba(0,0,0,1) 58%, rgba(0,0,0,0) 92%)",
+                WebkitMaskSize: "125% 125%",
+                maskSize: "125% 125%",
+                WebkitMaskRepeat: "no-repeat",
+                maskRepeat: "no-repeat",
+              }}
+              loading="lazy"
+            />
+            <motion.img
+              initial={{ opacity: 0, y: 40, rotate: 4 }}
+              animate={{ opacity: 0.8, y: 0, rotate: 1.5 }}
+              transition={{
+                duration: 1.1,
+                delay: 0.12,
+                ease: [0.22, 1, 0.36, 1],
+              }}
+              src="/CXRNLPA%20250.jpg"
+              alt="Annotated frontal chest X-ray identifying organs"
+              className="pointer-events-none absolute hidden right-8 top-32 w-56 max-w-full select-none opacity-70 lg:block xl:right-16 xl:top-24 xl:w-64"
+              style={{
+                WebkitMaskImage:
+                  "radial-gradient(circle at center, rgba(0,0,0,1) 58%, rgba(0,0,0,0) 92%)",
+                maskImage:
+                  "radial-gradient(circle at center, rgba(0,0,0,1) 58%, rgba(0,0,0,0) 92%)",
+                WebkitMaskSize: "125% 125%",
+                maskSize: "125% 125%",
+                WebkitMaskRepeat: "no-repeat",
+                maskRepeat: "no-repeat",
+              }}
+              loading="lazy"
+            />
+            <motion.h1
+              initial={{ opacity: 0, y: 32, filter: "blur(18px)" }}
+              animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+              transition={{ delay: 0.1, duration: 0.7, ease: "easeOut" }}
+              style={{ willChange: "transform, filter" }}
+              className="mx-auto mt-8 max-w-3xl text-5xl font-semibold leading-tight tracking-[-0.03em] text-white sm:text-6xl md:text-7xl"
+            >
+              <span className="gradient-flow-text block text-transparent bg-clip-text bg-[linear-gradient(120deg,#040b1a,#0ea5e9,#1e3a8a,#0ea5e9)]">
+                See Beyond the Image — Diagnose with Clarity.
+              </span>
+            </motion.h1>
+            <motion.p
+              initial={{ opacity: 0, y: 24, filter: "blur(16px)" }}
+              animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+              transition={{ delay: 0.25, duration: 0.6, ease: "easeOut" }}
+              style={{ willChange: "transform, filter" }}
+              className="mx-auto mt-6 max-w-2xl text-lg italic text-white/70 sm:text-xl"
+            >
+              Clarity accelerates thoracic diagnostics with AI-guided intuition:
+              upload a chest X-ray, and we surface probable conditions,
+              heat-maps, and printable summaries in seconds.
+            </motion.p>
+            <MagneticButton
+              onClick={handleScrollToUpload}
+              className={`mt-10 ${primaryButtonClasses}`}
+            >
+              <span className="text-base leading-none">↓</span>
+              <span>Upload X-ray</span>
+              <span className={buttonDotClasses} />
+            </MagneticButton>
+          </section>
+
+          <section id="spotlight" className="relative px-6 pt-16 sm:px-12">
+            <motion.div
+              initial={{ opacity: 0, y: 48 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.3 }}
+              transition={{ duration: 0.7, ease: "easeOut" }}
+              className="relative mx-auto flex w-full max-w-5xl flex-col items-center gap-10 rounded-[34px] bg-[#081226]/80 px-6 py-10 backdrop-blur-2xl sm:px-10 lg:flex-row lg:gap-14"
+            >
+              {/* Gradient Border Wrapper */}
+              <div className="pointer-events-none absolute inset-0 rounded-[34px] p-[1px] bg-gradient-to-br from-white/20 via-white/5 to-transparent -z-10">
+                <div className="h-full w-full rounded-[33px] bg-[#081226]/80" />
+              </div>
+              <motion.div
+                ref={spotlightRef}
+                style={{ y: spotlightYSpring }}
+                className="w-full max-w-xl overflow-hidden rounded-[28px] shadow-[0_30px_70px_-40px_rgba(14,165,233,0.8)]"
+              >
+                {spotlightBroken ? (
+                  <div className="flex h-full min-h-80 w-full items-center justify-center bg-[radial-gradient(circle_at_center,rgba(14,165,233,0.25),rgba(2,7,19,0.95))]">
+                    <div className="text-center text-sm text-white/60">
+                      Preview coming soon.
+                    </div>
+                  </div>
+                ) : (
+                  <img
+                    src="/iStock-115987328.webp"
+                    alt="AI spotlight highlighting lung opacity"
+                    className="h-full w-full object-cover"
+                    loading="lazy"
+                    onError={() => setSpotlightBroken(true)}
+                  />
+                )}
+              </motion.div>
+
+              <div className="w-full text-left">
+                <div className="inline-flex items-center gap-2 rounded-full bg-cyan-400/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.3em] text-cyan-200">
+                  AI Clinical Spotlight
+                </div>
+                <h2 className="mt-6 text-4xl font-semibold text-white sm:text-5xl">
+                  <span className="gradient-flow-text text-transparent bg-clip-text bg-[linear-gradient(120deg,#06183a,#0ea5e9,#1e3a8a,#0ea5e9)]">
+                    Case Insight: Atypical Lobar Opacity
+                  </span>
+                </h2>
+                <p className="mt-4 text-base italic text-white/65 sm:text-lg">
+                  Generated by Clarity's ensemble of thoracic classifiers, this
+                  anonymised scan showcases how our Heat Map overlays isolate
+                  regions of suspicion while keeping radiologists in control of
+                  the narrative.
+                </p>
+                <ul className="mt-6 space-y-3 text-sm text-white/60">
+                  {spotlightPoints.map((point) => (
+                    <li key={point} className="flex items-start gap-3">
+                      <span className="mt-1 inline-flex h-2.5 w-2.5 shrink-0 rounded-full bg-cyan-300" />
+                      <span>{point}</span>
+                    </li>
+                  ))}
+                </ul>
+                <MagneticButton
+                  onClick={handleScrollToUpload}
+                  className={`mt-8 inline-flex ${primaryButtonClasses}`}
+                >
+                  <span className="text-base leading-none">→</span>
+                  <span>Analyse a new study</span>
+                  <span className={buttonDotClasses} />
+                </MagneticButton>
+              </div>
+            </motion.div>
+          </section>
+
+          <section id="statistics" className="relative px-6 pt-20 sm:px-12">
+            <div className="pointer-events-none absolute inset-0">
+              <div className="absolute left-1/2 top-10 h-72 w-72 -translate-x-1/2 rounded-full bg-cyan-500/15 blur-[110px]" />
+              <div className="absolute right-10 top-40 h-60 w-60 rounded-full bg-violet-500/10 blur-[120px]" />
+              {Array.from({ length: 12 }).map((_, index) => (
+                <span
+                  key={`stat-particle-${index}`}
+                  className="particle-rise absolute h-1.5 w-1.5 rounded-full bg-cyan-300/45"
+                  style={{
+                    left: `${8 + ((index * 7) % 90)}%`,
+                    bottom: `${(index * 13) % 85}%`,
+                    animationDelay: `${index * 0.6}s`,
+                    animationDuration: `${5 + (index % 4)}s`,
+                  }}
+                />
+              ))}
+            </div>
+
+            <div className="relative mx-auto max-w-5xl">
+              <motion.h2
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.3 }}
+                transition={{ duration: 0.6, ease: "easeOut" }}
+                className="text-center text-4xl font-semibold text-white sm:text-5xl"
+                style={{ y: statsYSpring }}
+              >
+                <span className="gradient-flow-text text-transparent bg-clip-text bg-[linear-gradient(120deg,#06183a,#0ea5e9,#1e3a8a,#0ea5e9)]">
+                  Global & Indian Respiratory Insights
+                </span>
+              </motion.h2>
+              <motion.p
+                initial={{ opacity: 0, y: 24 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.3 }}
+                transition={{ duration: 0.6, delay: 0.12, ease: "easeOut" }}
+                className="mx-auto mt-4 max-w-3xl text-center text-base italic text-white/65 sm:text-lg"
+                style={{ y: statsYSpring }}
+              >
+                Live counters highlight how urgent lung-health interventions
+                remain—from India’s rising case load to the global population
+                managing chronic respiratory disease.
+              </motion.p>
+
+              <div className="relative mt-12 flex flex-col gap-12">
+                {statGroups.map((group, index) => (
+                  <StatsGroup
+                    key={group.id}
+                    group={group}
+                    staggerIndex={index}
+                  />
+                ))}
+              </div>
+            </div>
+          </section>
+
+          <section id="diseases" className="relative px-6 pt-20 sm:px-12">
+            <div className="pointer-events-none absolute inset-x-0 -top-20 -z-10 flex justify-center">
+              <div className="h-56 w-[420px] rounded-full bg-[radial-gradient(65%_65%_at_50%_50%,rgba(18,38,68,0.6),rgba(6,18,38,0.12)_70%,transparent)] blur-[120px]" />
+            </div>
+            <div className="relative z-10 mx-auto max-w-6xl">
+              <motion.h2
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.3 }}
+                transition={{ duration: 0.6, ease: "easeOut" }}
+                className="text-center text-4xl font-semibold text-white sm:text-5xl"
+              >
+                <span className="gradient-flow-text text-transparent bg-clip-text bg-[linear-gradient(120deg,#06183a,#0ea5e9,#1e3a8a,#0ea5e9)]">
+                  Most Common Lung Diseases
+                </span>
+              </motion.h2>
+              <motion.p
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.3 }}
+                transition={{ duration: 0.55, delay: 0.12, ease: "easeOut" }}
+                className="mx-auto mt-4 max-w-3xl text-center text-base italic text-white/65 sm:text-lg"
+              >
+                Swipe through the respiratory conditions clinicians flag most
+                often. Each profile comes with a short briefing so teams can
+                triage outcomes faster.
+              </motion.p>
+
+              <div className="relative mt-10 flex flex-col items-center justify-center overflow-hidden">
+                {/* Gradient Masks */}
+                <div className="pointer-events-none absolute left-0 top-0 z-20 h-full w-24 bg-gradient-to-r from-[#030c1c] to-transparent" />
+                <div className="pointer-events-none absolute right-0 top-0 z-20 h-full w-24 bg-gradient-to-l from-[#030c1c] to-transparent" />
+
+                {/* Infinite Marquee Track */}
+                <div className="flex w-full overflow-hidden">
+                  <motion.div
+                    className="flex gap-6 pr-6"
+                    animate={{
+                      x: ["0%", "-50%"],
+                    }}
+                    transition={{
+                      duration: 40,
+                      ease: "linear",
+                      repeat: Infinity,
+                    }}
+                  >
+                    {[...diseaseCards, ...diseaseCards].map((card, index) => (
+                      <DiseaseCard
+                        key={`${card.id}-${index}`}
+                        card={card}
+                        index={index}
+                        onOpen={() =>
+                          setActiveSlide(index % diseaseCards.length)
+                        }
+                      />
+                    ))}
+                  </motion.div>
+                </div>
+              </div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.3 }}
+                transition={{ duration: 0.55, delay: 0.2, ease: "easeOut" }}
+                className="mx-auto mt-12 flex max-w-md items-center gap-3 rounded-3xl border border-white/10 bg-white/5 px-4 py-3 text-xs text-white/70"
+              >
+                <span className="flex h-2.5 w-2.5 animate-ping rounded-full bg-teal-300/80" />
+                <span>
+                  Did you know? An adult can take around{" "}
+                  <span className="font-semibold text-white">
+                    20,000 breaths
+                  </span>{" "}
+                  every day—making early respiratory insights all the more
+                  critical.
+                </span>
+              </motion.div>
+            </div>
+          </section>
+
+          <section
+            id="upload"
+            ref={uploadRef}
+            className="relative px-6 pt-20 pb-16 sm:px-12"
           >
             <motion.div
-              className="relative w-[min(460px,92vw)] overflow-hidden rounded-4xl border border-white/12 bg-[linear-gradient(140deg,rgba(24,54,147,0.97),rgba(8,18,56,0.97))] p-8 text-left shadow-[0_48px_160px_-60px_rgba(35,108,255,0.9)]"
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.94 }}
-              transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+              ref={uploadRef}
+              style={{ y: uploadYSpring }}
+              initial={{ opacity: 0, y: 40 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.3 }}
+              transition={{ duration: 0.7, ease: "easeOut" }}
+              className="mx-auto max-w-4xl rounded-4xl border border-white/10 bg-white/5 p-8 text-white shadow-[0_35px_110px_-40px_rgba(20,120,255,0.65)] backdrop-blur-3xl"
             >
-              <div className="pointer-events-none absolute inset-0 opacity-80">
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(94,149,255,0.6),transparent_60%)]" />
-                <div className="absolute -bottom-28 -left-20 h-64 w-64 rounded-full bg-[rgba(64,120,255,0.28)] blur-3xl" />
-                <div className="absolute -top-20 right-10 h-40 w-40 rounded-full bg-[rgba(109,160,255,0.32)] blur-[90px]" />
-              </div>
-              <div className="relative z-10">
-                <div className="flex items-center gap-2 text-[0.65rem] font-semibold uppercase tracking-[0.48em] text-sky-100/85">
-                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/12 text-sky-200">
+              <div className="flex flex-col gap-6">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h2 className="text-3xl font-semibold text-white">
+                      <span className="gradient-flow-text text-transparent bg-clip-text bg-[linear-gradient(120deg,#06183a,#0ea5e9,#1e3a8a,#0ea5e9)]">
+                        Edit image
+                      </span>
+                    </h2>
+                    <p className="mt-1 text-base italic text-white/60 sm:text-lg">
+                      At least 256x256px, PNG or JPG file
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={resetUpload}
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/12 text-white/70 transition hover:border-white/25 hover:text-white"
+                    aria-label="Clear image"
+                  >
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
                       viewBox="0 0 24 24"
+                      className="h-4 w-4"
                       fill="none"
                       stroke="currentColor"
                       strokeWidth="1.5"
-                      className="h-4 w-4"
                     >
                       <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
-                        d="M12 3v6l3-3m-3 3-3-3"
-                      />
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M7.5 13a4.5 4.5 0 0 0 9 0c0-1.657 1.343-3 3-3"
+                        d="m7 7 10 10M17 7 7 17"
                       />
                     </svg>
-                  </span>
-                  {loaderHeadline}
+                  </button>
                 </div>
-                <div className="mt-6 flex items-baseline gap-6">
-                  <span className="text-6xl font-semibold text-white drop-shadow-[0_12px_35px_rgba(23,78,203,0.35)]">
-                    {loaderProgress}
-                    <span className="text-2xl align-super">%</span>
-                  </span>
-                  <span className="flex items-center gap-2 text-sm text-sky-100/85">
-                    <span className="inline-flex h-1.5 w-1.5 rounded-full bg-sky-200/80" />
-                    {loaderStatusText}
-                  </span>
+
+                <div className="flex flex-col gap-6 lg:flex-row">
+                  <div
+                    onDragOver={(event) => {
+                      event.preventDefault();
+                      setIsDragging(true);
+                    }}
+                    onDragLeave={(event) => {
+                      event.preventDefault();
+                      setIsDragging(false);
+                    }}
+                    onDrop={handleDrop}
+                    className={`relative flex-1 rounded-3xl border-2 px-6 py-8 transition ${
+                      isDragging
+                        ? "border-cyan-300/70 bg-cyan-400/15"
+                        : "border-white/10 bg-white/5"
+                    }`}
+                  >
+                    <div className="flex h-full min-h-60 items-center justify-center rounded-3xl border border-white/10 bg-white/10 p-6 backdrop-blur-2xl">
+                      {previewUrl ? (
+                        <div className="flex h-60 w-full items-center justify-center overflow-hidden rounded-2xl bg-[#050d20]/60">
+                          <img
+                            src={previewUrl}
+                            alt={uploadedFile?.name || "Uploaded preview"}
+                            className="max-h-full max-w-full object-contain transition-transform duration-300"
+                            style={{
+                              transform: `scale(${
+                                previewScale / 100
+                              }) rotate(${previewRotation}deg)`,
+                            }}
+                          />
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center text-white/70">
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.5"
+                            className="h-10 w-10"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="m4 16 6-6 4 4 6-6"
+                            />
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6"
+                            />
+                          </svg>
+                          <p className="mt-4 text-sm font-medium text-white/80">
+                            Drop image here
+                          </p>
+                          <p className="text-xs text-white/55">
+                            Supports DICOM, JPEG, PNG
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                    {uploadedFile && (
+                      <div className="absolute bottom-4 left-6 right-6 rounded-2xl border border-white/10 bg-[#0a1d3b]/80 px-4 py-3 text-sm text-white/80 shadow-[0_18px_45px_-28px_rgba(33,150,243,0.6)] backdrop-blur-md">
+                        <div className="font-medium text-white">
+                          {uploadedFile.name}
+                        </div>
+                        <div className="text-xs text-white/60">
+                          {(uploadedFile.size / 1024 / 1024).toFixed(2)} MB
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex w-full flex-col gap-6 rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-2xl lg:w-80">
+                    <div>
+                      <span className="text-sm font-semibold text-white/90">
+                        Scale image
+                      </span>
+                      <div className="mt-3 flex items-center gap-3">
+                        <span className="text-xs text-white/40">–</span>
+                        <input
+                          type="range"
+                          min="70"
+                          max="120"
+                          value={previewScale}
+                          onChange={(event) =>
+                            setPreviewScale(Number(event.target.value))
+                          }
+                          className="h-2 w-full cursor-pointer appearance-none rounded-full bg-white/15 accent-cyan-400"
+                        />
+                        <span className="text-xs text-white/40">+</span>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-3">
+                      <span className="text-sm font-semibold text-white/90">
+                        Rotate image
+                      </span>
+                      <div className="flex gap-3">
+                        <button
+                          type="button"
+                          onClick={() => handleRotation("left")}
+                          className="flex h-11 w-full items-center justify-center rounded-2xl border border-white/10 text-white/70 transition hover:border-cyan-300/40 hover:text-cyan-200"
+                        >
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.5"
+                            className="h-5 w-5"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M3.75 7.5H6a8.25 8.25 0 1 1-2.41 5.84"
+                            />
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M3.75 4.5v3h3"
+                            />
+                          </svg>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRotation("right")}
+                          className="flex h-11 w-full items-center justify-center rounded-2xl border border-white/10 text-white/70 transition hover:border-cyan-300/40 hover:text-cyan-200"
+                        >
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.5"
+                            className="h-5 w-5"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M20.25 16.5H18a8.25 8.25 0 1 1 2.41-5.84"
+                            />
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M20.25 19.5v-3h-3"
+                            />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-3">
+                      <span className="text-sm font-semibold text-white/90">
+                        Upload image
+                      </span>
+                      <label className="inline-flex w-full cursor-pointer items-center justify-center rounded-2xl border border-white/10 bg-white/10 px-4 py-2 text-sm font-medium text-white/80 transition hover:border-cyan-300/40 hover:text-cyan-100">
+                        Browse
+                        <input
+                          type="file"
+                          accept=".png,.jpg,.jpeg,.dicom,.dcm"
+                          onChange={handleInputChange}
+                          className="hidden"
+                        />
+                      </label>
+                      <span className="text-xs text-white/55">
+                        Maximum size: 30 MB
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                <div className="mt-7">
-                  <div className="relative h-14 overflow-hidden rounded-3xl border border-white/15 bg-white/10 backdrop-blur-[2px]">
-                    <motion.div
-                      className="absolute inset-y-1 left-1 flex items-center justify-end rounded-2xl bg-[linear-gradient(115deg,#e8f1ff,#a7c5ff,#6f97ff)] text-sm font-semibold text-[#16316f] shadow-[0_10px_55px_-30px_rgba(129,178,255,0.9)]"
-                      animate={{ width: `${Math.max(loaderProgress, 8)}%` }}
-                      transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-                      style={{ minWidth: "4.5rem" }}
+
+                <div className="flex items-center justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={resetUpload}
+                    className="rounded-2xl border border-white/10 px-5 py-2 text-sm font-medium text-white/70 transition hover:border-white/25 hover:text-white"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!uploadedFile}
+                    onClick={() => handleNavigateToPredict("summary")}
+                    className={`rounded-2xl px-6 py-2 text-sm font-semibold text-white transition ${
+                      uploadedFile
+                        ? "bg-linear-to-r from-cyan-400 via-sky-500 to-blue-600 shadow-[0_18px_45px_-28px_rgba(33,150,243,0.7)] hover:shadow-[0_18px_48px_-22px_rgba(33,150,243,0.8)]"
+                        : "bg-white/10 text-white/40 cursor-not-allowed"
+                    }`}
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-8 flex flex-wrap justify-center gap-4">
+                {uploadActions.map((action) => {
+                  const isDisabled = !uploadedFile;
+                  const motionProps = isDisabled
+                    ? {}
+                    : {
+                        whileHover: { scale: 1.04 },
+                        whileTap: { scale: 0.96 },
+                      };
+
+                  return (
+                    <MagneticButton
+                      key={action.id}
+                      type="button"
+                      onClick={() => handleNavigateToPredict(action.view)}
+                      disabled={isDisabled}
+                      className={
+                        isDisabled
+                          ? disabledButtonClasses
+                          : primaryButtonClasses
+                      }
                     >
-                      <span className="pr-4">{loaderProgress}%</span>
-                    </motion.div>
-                    <div className="pointer-events-none absolute inset-0 rounded-3xl bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.18),transparent_70%)]" />
+                      <span className="text-base leading-none">↗</span>
+                      <span>{action.label}</span>
+                      <span
+                        className={
+                          isDisabled ? disabledDotClasses : buttonDotClasses
+                        }
+                      />
+                    </MagneticButton>
+                  );
+                })}
+              </div>
+            </motion.div>
+          </section>
+
+          <section
+            id="about"
+            ref={aboutRef}
+            className="relative px-6 pt-16 pb-24 sm:px-12"
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 48 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.3 }}
+              transition={{ duration: 0.75, ease: "easeOut" }}
+              className="relative mx-auto w-full max-w-5xl overflow-hidden rounded-[46px] border border-white/12 bg-linear-to-br from-white/95 via-sky-50/95 to-blue-100/90 text-slate-900 shadow-[0_40px_120px_-55px_rgba(46,115,255,0.65)]"
+              style={{ y: aboutRef ? statsYSpring : undefined }}
+            >
+              <div className="pointer-events-none absolute inset-0">
+                <div className="absolute -top-20 left-10 h-64 w-64 rotate-12 rounded-[36px] bg-white/60 blur-3xl" />
+                <div className="absolute -bottom-28 right-10 h-72 w-72 -rotate-6 rounded-[36px] bg-sky-200/70 blur-[120px]" />
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.28),transparent_55%)]" />
+              </div>
+
+              <div className="relative grid gap-14 px-8 py-14 sm:px-16 sm:py-20">
+                <div className="max-w-3xl">
+                  <h2 className="text-4xl font-semibold leading-tight tracking-tight text-slate-900 sm:text-5xl md:text-[3.4rem]">
+                    Where Healthcare
+                    <span className="text-blue-600">.</span>
+                    <br className="hidden sm:block" />
+                    Meets Clarity
+                    <span className="text-blue-500">.</span>
+                  </h2>
+                  <p className="mt-6 text-base leading-relaxed text-slate-600">
+                    At Clarity, we bring the worlds of Machine Learning and
+                    Artificial Intelligence together to redefine how medical
+                    imaging is understood. Our platform is designed to assist
+                    radiologists and doctors by offering fast, accurate, and
+                    explainable diagnostic insights from chest X-rays.
+                  </p>
+                  <p className="mt-4 text-base leading-relaxed text-slate-600">
+                    We believe that technology should not replace expertise — it
+                    should empower it. With every prediction, visualization, and
+                    generated report, Clarity aims to enhance medical
+                    decision-making and make diagnostics more transparent,
+                    efficient, and reliable.
+                  </p>
+                  <p className="mt-4 text-base leading-relaxed text-slate-600">
+                    Our goal is simple: to make healthcare smarter, diagnostics
+                    clearer, and patient outcomes better — one image at a time.
+                  </p>
+                  <p className="mt-6 text-base leading-relaxed text-slate-600">
+                    Clarity isn’t just a project — it’s a vision to make medical
+                    intelligence accessible, understandable, and trustworthy for
+                    every healthcare professional.
+                  </p>
+                </div>
+
+                <div className="relative rounded-[36px] border border-slate-900/20 bg-[#0a1635]/95 p-8 text-white shadow-[0_32px_90px_-55px_rgba(10,23,52,0.9)] backdrop-blur-xl sm:p-10">
+                  <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="max-w-sm">
+                      <h3 className="text-3xl font-semibold text-white">
+                        Our Core Values
+                      </h3>
+                      <p className="mt-3 text-sm text-white/70">
+                        At Clarity, our foundation rests on four strong pillars
+                        that guide every innovation we create.
+                      </p>
+                    </div>
+                    <motion.span
+                      initial={{ opacity: 0, y: 8 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      viewport={{ once: true, amount: 0.4 }}
+                      transition={{
+                        delay: 0.2,
+                        duration: 0.5,
+                        ease: "easeOut",
+                      }}
+                      className="inline-flex items-center gap-2 rounded-full border border-blue-300/30 bg-blue-500/15 px-4 py-2 text-xs font-semibold uppercase tracking-[0.28em] text-blue-200"
+                    >
+                      Trusted by clinicians
+                    </motion.span>
                   </div>
-                  <div className="mt-3 flex justify-between text-[0.65rem] font-semibold tracking-[0.36em] text-sky-100/60">
-                    <span>0</span>
-                    <span>50</span>
-                    <span>100</span>
+
+                  <div className="mt-8 grid gap-4 sm:grid-cols-2">
+                    {coreValues.map((item, index) => (
+                      <motion.div
+                        key={item.title}
+                        initial={{ opacity: 0, y: 24 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={{ once: true, amount: 0.25 }}
+                        transition={{
+                          delay: index * 0.12,
+                          duration: 0.45,
+                          ease: [0.22, 0.84, 0.44, 1],
+                        }}
+                        className="flex items-start gap-4 rounded-3xl border border-white/10 bg-white/10 p-5 text-left transition hover:border-blue-300/40 hover:bg-blue-500/10"
+                      >
+                        <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-500/20 text-blue-200">
+                          {item.icon}
+                        </span>
+                        <div>
+                          <h4 className="text-base font-semibold text-white">
+                            {item.title}
+                          </h4>
+                          <p className="mt-1 text-xs leading-relaxed text-white/70">
+                            {item.description}
+                          </p>
+                        </div>
+                      </motion.div>
+                    ))}
                   </div>
                 </div>
-                <div className="mt-7 flex items-center gap-3 text-sm text-sky-100/90">
-                  <span className="inline-flex h-3 w-3 animate-pulse rounded-full bg-sky-300 shadow-[0_0_15px_rgba(125,162,255,0.9)]" />
-                  {loaderMessage}
+              </div>
+            </motion.div>
+          </section>
+        </div>
+        {/* Slide viewer: lightbox-style interactive presentation for disease cards */}
+        {activeSlide !== null ? (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6"
+            onClick={() => setActiveSlide(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.96, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.96, opacity: 0 }}
+              transition={{ duration: 0.28, ease: "easeOut" }}
+              onClick={(e) => e.stopPropagation()}
+              className="relative max-w-3xl rounded-3xl bg-[#061025]/95 p-8 text-white shadow-2xl"
+            >
+              <div className="flex items-start justify-between gap-6">
+                <div className="flex items-center gap-4">
+                  <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-white/12 p-3 text-2xl">
+                    {renderDiseaseIcon(diseaseCards[activeSlide].id, "h-6 w-6")}
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-semibold">
+                      {diseaseCards[activeSlide].title}
+                    </h3>
+                    <p className="mt-1 text-sm text-white/70">
+                      {diseaseCards[activeSlide].description}
+                    </p>
+                  </div>
                 </div>
-                <div className="mt-6 flex items-center gap-3 text-[0.7rem] uppercase tracking-[0.4em] text-sky-100/45">
-                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-white/20">
-                    <span className="h-3 w-3 animate-spin rounded-full border-2 border-white/20 border-t-white/70" />
-                  </span>
-                  {loaderFooterText}
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setActiveSlide(
+                        (s) =>
+                          (s - 1 + diseaseCards.length) % diseaseCards.length
+                      )
+                    }
+                    className="rounded-full bg-white/6 p-2 text-white/80 hover:bg-white/12"
+                    aria-label="Previous"
+                  >
+                    ←
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setActiveSlide((s) => (s + 1) % diseaseCards.length)
+                    }
+                    className="rounded-full bg-white/6 p-2 text-white/80 hover:bg-white/12"
+                    aria-label="Next"
+                  >
+                    →
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveSlide(null)}
+                    className="ml-3 rounded-full bg-white/6 p-2 text-white/80 hover:bg-white/12"
+                    aria-label="Close"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2">
+                <div className="rounded-2xl border border-white/6 bg-black/40 p-4">
+                  <img
+                    src={`/iStock-115987328.webp`}
+                    alt={diseaseCards[activeSlide].title}
+                    className="h-56 w-full object-cover rounded-lg"
+                  />
+                </div>
+                <div>
+                  <h4 className="text-lg font-semibold">Details</h4>
+                  <p className="mt-3 text-sm text-white/70">
+                    {diseaseCards[activeSlide].description}
+                  </p>
+                  <div className="mt-4 flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => alert("Placeholder: open prediction flow")}
+                      className="inline-flex items-center gap-2 rounded-full bg-cyan-500 px-4 py-2 text-sm font-semibold text-white"
+                    >
+                      Open in Clarity
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveSlide(null)}
+                      className="inline-flex items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-sm text-white/70"
+                    >
+                      Close
+                    </button>
+                  </div>
                 </div>
               </div>
             </motion.div>
           </motion.div>
         ) : null}
-      </AnimatePresence>
-
-      <div className="pointer-events-none absolute inset-0 opacity-95">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(8,40,90,0.7),rgba(1,6,18,1))]" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom,rgba(1,10,26,0.95),#01030d)]" />
-        <div
-          className="absolute -top-44 -left-32 rounded-full bg-linear-to-br from-[#0f2560]/75 via-[#1b3d7a]/60 to-transparent blur-[140px] opacity-90"
-          style={{ width: "34rem", height: "34rem" }}
-        />
-        <div
-          className="absolute bottom-0 -right-48 rounded-full bg-linear-to-tl from-[#07163a]/85 via-[#102552]/65 to-transparent blur-[160px] opacity-95"
-          style={{ width: "46rem", height: "46rem" }}
-        />
-        <div className="absolute top-1/3 right-1/3 h-60 w-60 rounded-full bg-white/8 blur-3xl opacity-35 mix-blend-screen" />
+        <Footer />
       </div>
-      <BackgroundGrid className="z-10 opacity-50" />
-
-      <motion.div
-        className="pointer-events-none absolute inset-0 z-20 backdrop-blur-[1.5px]"
-        style={entryOverlayStyle}
-        initial={{ opacity: 0.45 }}
-        animate={{ opacity: 0 }}
-        transition={{ duration: 0.65, ease: [0.16, 1, 0.3, 1] }}
-      />
-
-      <div className="relative z-10 flex min-h-screen flex-col px-4 pb-24 pt-10 sm:px-8">
-        <header className="px-6 pt-8 sm:px-10">
-          <PrimaryNav
-            onNavigate={handlePrimaryNavigation}
-            maxWidthClass="max-w-5xl"
-          />
-        </header>
-
-        <section id="home" className="relative px-6 pt-12 text-center sm:px-12">
-          <motion.img
-            initial={{ opacity: 0, y: 40, rotate: -4 }}
-            animate={{ opacity: 0.8, y: 0, rotate: -1.5 }}
-            transition={{ duration: 1.1, ease: [0.22, 1, 0.36, 1] }}
-            src="/Chest%20X-ray%20Label%20250.jpg"
-            alt="Annotated lateral chest X-ray highlighting key structures"
-            className="pointer-events-none absolute hidden left-8 top-28 w-56 max-w-full select-none opacity-70 lg:block xl:left-16 xl:top-20 xl:w-64"
-            style={{
-              WebkitMaskImage:
-                "radial-gradient(circle at center, rgba(0,0,0,1) 58%, rgba(0,0,0,0) 92%)",
-              maskImage:
-                "radial-gradient(circle at center, rgba(0,0,0,1) 58%, rgba(0,0,0,0) 92%)",
-              WebkitMaskSize: "125% 125%",
-              maskSize: "125% 125%",
-              WebkitMaskRepeat: "no-repeat",
-              maskRepeat: "no-repeat",
-            }}
-            loading="lazy"
-          />
-          <motion.img
-            initial={{ opacity: 0, y: 40, rotate: 4 }}
-            animate={{ opacity: 0.8, y: 0, rotate: 1.5 }}
-            transition={{
-              duration: 1.1,
-              delay: 0.12,
-              ease: [0.22, 1, 0.36, 1],
-            }}
-            src="/CXRNLPA%20250.jpg"
-            alt="Annotated frontal chest X-ray identifying organs"
-            className="pointer-events-none absolute hidden right-8 top-32 w-56 max-w-full select-none opacity-70 lg:block xl:right-16 xl:top-24 xl:w-64"
-            style={{
-              WebkitMaskImage:
-                "radial-gradient(circle at center, rgba(0,0,0,1) 58%, rgba(0,0,0,0) 92%)",
-              maskImage:
-                "radial-gradient(circle at center, rgba(0,0,0,1) 58%, rgba(0,0,0,0) 92%)",
-              WebkitMaskSize: "125% 125%",
-              maskSize: "125% 125%",
-              WebkitMaskRepeat: "no-repeat",
-              maskRepeat: "no-repeat",
-            }}
-            loading="lazy"
-          />
-          <motion.h1
-            initial={{ opacity: 0, y: 32, filter: "blur(18px)" }}
-            animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-            transition={{ delay: 0.1, duration: 0.7, ease: "easeOut" }}
-            style={{ willChange: "transform, filter" }}
-            className="mx-auto mt-8 max-w-3xl text-5xl font-semibold leading-tight tracking-[-0.03em] text-white sm:text-6xl md:text-7xl"
-          >
-            <span className="gradient-flow-text block text-transparent bg-clip-text bg-[linear-gradient(120deg,#040b1a,#0ea5e9,#1e3a8a,#0ea5e9)]">
-              See Beyond the Image — Diagnose with Clarity.
-            </span>
-          </motion.h1>
-          <motion.p
-            initial={{ opacity: 0, y: 24, filter: "blur(16px)" }}
-            animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-            transition={{ delay: 0.25, duration: 0.6, ease: "easeOut" }}
-            style={{ willChange: "transform, filter" }}
-            className="mx-auto mt-6 max-w-2xl text-lg italic text-white/70 sm:text-xl"
-          >
-            Clarity accelerates thoracic diagnostics with AI-guided intuition:
-            upload a chest X-ray, and we surface probable conditions, heat-maps,
-            and printable summaries in seconds.
-          </motion.p>
-          <motion.button
-            onClick={handleScrollToUpload}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.96 }}
-            className={`mt-10 ${primaryButtonClasses}`}
-          >
-            <span className="text-base leading-none">↓</span>
-            <span>Upload X-ray</span>
-            <span className={buttonDotClasses} />
-          </motion.button>
-        </section>
-
-        <section id="spotlight" className="relative px-6 pt-16 sm:px-12">
-          <motion.div
-            initial={{ opacity: 0, y: 48 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, amount: 0.3 }}
-            transition={{ duration: 0.7, ease: "easeOut" }}
-            className="mx-auto flex w-full max-w-5xl flex-col items-center gap-10 rounded-[34px] bg-white/5 px-6 py-10 backdrop-blur-2xl ring-1 ring-white/5 sm:px-10 lg:flex-row lg:gap-14"
-          >
-            <motion.div
-              ref={spotlightRef}
-              style={{ y: spotlightYSpring }}
-              className="w-full max-w-xl overflow-hidden rounded-[28px] shadow-[0_30px_70px_-40px_rgba(14,165,233,0.8)]"
-            >
-              {spotlightBroken ? (
-                <div className="flex h-full min-h-80 w-full items-center justify-center bg-[radial-gradient(circle_at_center,rgba(14,165,233,0.25),rgba(2,7,19,0.95))]">
-                  <div className="text-center text-sm text-white/60">
-                    Preview coming soon.
-                  </div>
-                </div>
-              ) : (
-                <img
-                  src="/iStock-115987328.webp"
-                  alt="AI spotlight highlighting lung opacity"
-                  className="h-full w-full object-cover"
-                  loading="lazy"
-                  onError={() => setSpotlightBroken(true)}
-                />
-              )}
-            </motion.div>
-
-            <div className="w-full text-left">
-              <div className="inline-flex items-center gap-2 rounded-full bg-cyan-400/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.3em] text-cyan-200">
-                AI Clinical Spotlight
-              </div>
-              <h2 className="mt-6 text-4xl font-semibold text-white sm:text-5xl">
-                <span className="gradient-flow-text text-transparent bg-clip-text bg-[linear-gradient(120deg,#06183a,#0ea5e9,#1e3a8a,#0ea5e9)]">
-                  Case Insight: Atypical Lobar Opacity
-                </span>
-              </h2>
-              <p className="mt-4 text-base italic text-white/65 sm:text-lg">
-                Generated by Clarity's ensemble of thoracic classifiers, this
-                anonymised scan showcases how our Heat Map overlays isolate
-                regions of suspicion while keeping radiologists in control of
-                the narrative.
-              </p>
-              <ul className="mt-6 space-y-3 text-sm text-white/60">
-                {spotlightPoints.map((point) => (
-                  <li key={point} className="flex items-start gap-3">
-                    <span className="mt-1 inline-flex h-2.5 w-2.5 shrink-0 rounded-full bg-cyan-300" />
-                    <span>{point}</span>
-                  </li>
-                ))}
-              </ul>
-              <motion.a
-                href="#upload"
-                whileHover={{ scale: 1.04 }}
-                whileTap={{ scale: 0.96 }}
-                className={`mt-8 inline-flex ${primaryButtonClasses}`}
-              >
-                <span className="text-base leading-none">→</span>
-                <span>Analyse a new study</span>
-                <span className={buttonDotClasses} />
-              </motion.a>
-            </div>
-          </motion.div>
-        </section>
-
-        <section id="statistics" className="relative px-6 pt-20 sm:px-12">
-          <div className="pointer-events-none absolute inset-0">
-            <div className="absolute left-1/2 top-10 h-72 w-72 -translate-x-1/2 rounded-full bg-cyan-500/15 blur-[110px]" />
-            <div className="absolute right-10 top-40 h-60 w-60 rounded-full bg-violet-500/10 blur-[120px]" />
-            {Array.from({ length: 12 }).map((_, index) => (
-              <span
-                key={`stat-particle-${index}`}
-                className="particle-rise absolute h-1.5 w-1.5 rounded-full bg-cyan-300/45"
-                style={{
-                  left: `${8 + ((index * 7) % 90)}%`,
-                  bottom: `${(index * 13) % 85}%`,
-                  animationDelay: `${index * 0.6}s`,
-                  animationDuration: `${5 + (index % 4)}s`,
-                }}
-              />
-            ))}
-          </div>
-
-          <div className="relative mx-auto max-w-5xl">
-            <motion.h2
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.3 }}
-              transition={{ duration: 0.6, ease: "easeOut" }}
-              className="text-center text-4xl font-semibold text-white sm:text-5xl"
-              style={{ y: statsYSpring }}
-            >
-              <span className="gradient-flow-text text-transparent bg-clip-text bg-[linear-gradient(120deg,#06183a,#0ea5e9,#1e3a8a,#0ea5e9)]">
-                Global & Indian Respiratory Insights
-              </span>
-            </motion.h2>
-            <motion.p
-              initial={{ opacity: 0, y: 24 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.3 }}
-              transition={{ duration: 0.6, delay: 0.12, ease: "easeOut" }}
-              className="mx-auto mt-4 max-w-3xl text-center text-base italic text-white/65 sm:text-lg"
-              style={{ y: statsYSpring }}
-            >
-              Live counters highlight how urgent lung-health interventions
-              remain—from India’s rising case load to the global population
-              managing chronic respiratory disease.
-            </motion.p>
-
-            <div className="relative mt-12 flex flex-col gap-12">
-              {statGroups.map((group, index) => (
-                <StatsGroup key={group.id} group={group} staggerIndex={index} />
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section id="diseases" className="relative px-6 pt-20 sm:px-12">
-          <div className="pointer-events-none absolute inset-x-0 -top-20 -z-10 flex justify-center">
-            <div className="h-56 w-[420px] rounded-full bg-[radial-gradient(65%_65%_at_50%_50%,rgba(18,38,68,0.6),rgba(6,18,38,0.12)_70%,transparent)] blur-[120px]" />
-          </div>
-          <div className="relative z-10 mx-auto max-w-6xl">
-            <motion.h2
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.3 }}
-              transition={{ duration: 0.6, ease: "easeOut" }}
-              className="text-center text-4xl font-semibold text-white sm:text-5xl"
-            >
-              <span className="gradient-flow-text text-transparent bg-clip-text bg-[linear-gradient(120deg,#06183a,#0ea5e9,#1e3a8a,#0ea5e9)]">
-                Most Common Lung Diseases
-              </span>
-            </motion.h2>
-            <motion.p
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.3 }}
-              transition={{ duration: 0.55, delay: 0.12, ease: "easeOut" }}
-              className="mx-auto mt-4 max-w-3xl text-center text-base italic text-white/65 sm:text-lg"
-            >
-              Swipe through the respiratory conditions clinicians flag most
-              often. Each profile comes with a short briefing so teams can
-              triage outcomes faster.
-            </motion.p>
-
-            <div className="relative mt-6">
-              <div className="pointer-events-none absolute inset-y-12 left-0 -z-10 w-48 -translate-x-16 rounded-full bg-[linear-gradient(90deg,rgba(3,12,28,0.88),rgba(3,12,28,0.6),transparent)] blur-[72px]" />
-              <div className="pointer-events-none absolute inset-y-12 right-0 -z-10 w-48 translate-x-16 rounded-full bg-[linear-gradient(270deg,rgba(3,12,28,0.88),rgba(3,12,28,0.6),transparent)] blur-[72px]" />
-              <div className="disease-carousel relative z-20 -mx-6 flex gap-6 overflow-x-auto overflow-y-visible pb-6 pl-6 pr-12 snap-x snap-mandatory sm:-mx-8 sm:pl-12 sm:pr-20">
-                {diseaseCards.map((card, index) => (
-                  <DiseaseCard
-                    key={card.id}
-                    card={card}
-                    index={index}
-                    onOpen={() => setActiveSlide(index)}
-                  />
-                ))}
-              </div>
-              <div className="mt-6 flex justify-center">
-                <div className="inline-flex items-center gap-3 rounded-full border border-white/12 bg-[#121f3d]/70 px-3 py-1.5 text-xs font-semibold text-white/70 shadow-[0_18px_40px_-28px_rgba(30,90,220,0.4)] backdrop-blur-xl">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const carousel =
-                        document.querySelector(".disease-carousel");
-                      carousel?.scrollBy({ left: -320, behavior: "smooth" });
-                    }}
-                    className="inline-flex items-center gap-2 rounded-full bg-[#1f46ff] px-3 py-1.5 text-white transition hover:bg-[#2b51ff]"
-                  >
-                    <span aria-hidden className="text-sm">
-                      ←
-                    </span>
-                    Scroll
-                  </button>
-                  <span className="text-[0.75rem] font-medium text-white/55">
-                    Drag or use arrows
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const carousel =
-                        document.querySelector(".disease-carousel");
-                      carousel?.scrollBy({ left: 320, behavior: "smooth" });
-                    }}
-                    className="inline-flex items-center gap-2 rounded-full bg-[#1f46ff] px-3 py-1.5 text-white transition hover:bg-[#2b51ff]"
-                  >
-                    Scroll
-                    <span aria-hidden className="text-sm">
-                      →
-                    </span>
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.3 }}
-              transition={{ duration: 0.55, delay: 0.2, ease: "easeOut" }}
-              className="mx-auto mt-12 flex max-w-md items-center gap-3 rounded-3xl border border-white/10 bg-white/5 px-4 py-3 text-xs text-white/70"
-            >
-              <span className="flex h-2.5 w-2.5 animate-ping rounded-full bg-teal-300/80" />
-              <span>
-                Did you know? An adult can take around{" "}
-                <span className="font-semibold text-white">20,000 breaths</span>{" "}
-                every day—making early respiratory insights all the more
-                critical.
-              </span>
-            </motion.div>
-          </div>
-        </section>
-
-        <section
-          id="upload"
-          ref={uploadRef}
-          className="relative px-6 pt-20 pb-16 sm:px-12"
-        >
-          <motion.div
-            ref={uploadRef}
-            style={{ y: uploadYSpring }}
-            initial={{ opacity: 0, y: 40 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, amount: 0.3 }}
-            transition={{ duration: 0.7, ease: "easeOut" }}
-            className="mx-auto max-w-4xl rounded-4xl border border-white/10 bg-white/5 p-8 text-white shadow-[0_35px_110px_-40px_rgba(20,120,255,0.65)] backdrop-blur-3xl"
-          >
-            <div className="flex flex-col gap-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <h2 className="text-3xl font-semibold text-white">
-                    <span className="gradient-flow-text text-transparent bg-clip-text bg-[linear-gradient(120deg,#06183a,#0ea5e9,#1e3a8a,#0ea5e9)]">
-                      Edit image
-                    </span>
-                  </h2>
-                  <p className="mt-1 text-base italic text-white/60 sm:text-lg">
-                    At least 256x256px, PNG or JPG file
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={resetUpload}
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/12 text-white/70 transition hover:border-white/25 hover:text-white"
-                  aria-label="Clear image"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    className="h-4 w-4"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="m7 7 10 10M17 7 7 17"
-                    />
-                  </svg>
-                </button>
-              </div>
-
-              <div className="flex flex-col gap-6 lg:flex-row">
-                <div
-                  onDragOver={(event) => {
-                    event.preventDefault();
-                    setIsDragging(true);
-                  }}
-                  onDragLeave={(event) => {
-                    event.preventDefault();
-                    setIsDragging(false);
-                  }}
-                  onDrop={handleDrop}
-                  className={`relative flex-1 rounded-3xl border-2 px-6 py-8 transition ${
-                    isDragging
-                      ? "border-cyan-300/70 bg-cyan-400/15"
-                      : "border-white/10 bg-white/5"
-                  }`}
-                >
-                  <div className="flex h-full min-h-60 items-center justify-center rounded-3xl border border-white/10 bg-white/10 p-6 backdrop-blur-2xl">
-                    {previewUrl ? (
-                      <div className="flex h-60 w-full items-center justify-center overflow-hidden rounded-2xl bg-[#050d20]/60">
-                        <img
-                          src={previewUrl}
-                          alt={uploadedFile?.name || "Uploaded preview"}
-                          className="max-h-full max-w-full object-contain transition-transform duration-300"
-                          style={{
-                            transform: `scale(${
-                              previewScale / 100
-                            }) rotate(${previewRotation}deg)`,
-                          }}
-                        />
-                      </div>
-                    ) : (
-                      <div className="flex flex-col items-center text-white/70">
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="1.5"
-                          className="h-10 w-10"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="m4 16 6-6 4 4 6-6"
-                          />
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6"
-                          />
-                        </svg>
-                        <p className="mt-4 text-sm font-medium text-white/80">
-                          Drop image here
-                        </p>
-                        <p className="text-xs text-white/55">
-                          Supports DICOM, JPEG, PNG
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                  {uploadedFile && (
-                    <div className="absolute bottom-4 left-6 right-6 rounded-2xl border border-white/10 bg-[#0a1d3b]/80 px-4 py-3 text-sm text-white/80 shadow-[0_18px_45px_-28px_rgba(33,150,243,0.6)] backdrop-blur-md">
-                      <div className="font-medium text-white">
-                        {uploadedFile.name}
-                      </div>
-                      <div className="text-xs text-white/60">
-                        {(uploadedFile.size / 1024 / 1024).toFixed(2)} MB
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex w-full flex-col gap-6 rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-2xl lg:w-80">
-                  <div>
-                    <span className="text-sm font-semibold text-white/90">
-                      Scale image
-                    </span>
-                    <div className="mt-3 flex items-center gap-3">
-                      <span className="text-xs text-white/40">–</span>
-                      <input
-                        type="range"
-                        min="70"
-                        max="120"
-                        value={previewScale}
-                        onChange={(event) =>
-                          setPreviewScale(Number(event.target.value))
-                        }
-                        className="h-2 w-full cursor-pointer appearance-none rounded-full bg-white/15 accent-cyan-400"
-                      />
-                      <span className="text-xs text-white/40">+</span>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col gap-3">
-                    <span className="text-sm font-semibold text-white/90">
-                      Rotate image
-                    </span>
-                    <div className="flex gap-3">
-                      <button
-                        type="button"
-                        onClick={() => handleRotation("left")}
-                        className="flex h-11 w-full items-center justify-center rounded-2xl border border-white/10 text-white/70 transition hover:border-cyan-300/40 hover:text-cyan-200"
-                      >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="1.5"
-                          className="h-5 w-5"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M3.75 7.5H6a8.25 8.25 0 1 1-2.41 5.84"
-                          />
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M3.75 4.5v3h3"
-                          />
-                        </svg>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleRotation("right")}
-                        className="flex h-11 w-full items-center justify-center rounded-2xl border border-white/10 text-white/70 transition hover:border-cyan-300/40 hover:text-cyan-200"
-                      >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="1.5"
-                          className="h-5 w-5"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M20.25 16.5H18a8.25 8.25 0 1 1 2.41-5.84"
-                          />
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M20.25 19.5v-3h-3"
-                          />
-                        </svg>
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col gap-3">
-                    <span className="text-sm font-semibold text-white/90">
-                      Upload image
-                    </span>
-                    <label className="inline-flex w-full cursor-pointer items-center justify-center rounded-2xl border border-white/10 bg-white/10 px-4 py-2 text-sm font-medium text-white/80 transition hover:border-cyan-300/40 hover:text-cyan-100">
-                      Browse
-                      <input
-                        type="file"
-                        accept=".png,.jpg,.jpeg,.dicom,.dcm"
-                        onChange={handleInputChange}
-                        className="hidden"
-                      />
-                    </label>
-                    <span className="text-xs text-white/55">
-                      Maximum size: 30 MB
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-end gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={resetUpload}
-                  className="rounded-2xl border border-white/10 px-5 py-2 text-sm font-medium text-white/70 transition hover:border-white/25 hover:text-white"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  disabled={!uploadedFile}
-                  onClick={() => handleNavigateToPredict("summary")}
-                  className={`rounded-2xl px-6 py-2 text-sm font-semibold text-white transition ${
-                    uploadedFile
-                      ? "bg-linear-to-r from-cyan-400 via-sky-500 to-blue-600 shadow-[0_18px_45px_-28px_rgba(33,150,243,0.7)] hover:shadow-[0_18px_48px_-22px_rgba(33,150,243,0.8)]"
-                      : "bg-white/10 text-white/40 cursor-not-allowed"
-                  }`}
-                >
-                  Save
-                </button>
-              </div>
-            </div>
-
-            <div className="mt-8 flex flex-wrap justify-center gap-4">
-              {uploadActions.map((action) => {
-                const isDisabled = !uploadedFile;
-                const motionProps = isDisabled
-                  ? {}
-                  : { whileHover: { scale: 1.04 }, whileTap: { scale: 0.96 } };
-
-                return (
-                  <motion.button
-                    key={action.id}
-                    type="button"
-                    onClick={() => handleNavigateToPredict(action.view)}
-                    disabled={isDisabled}
-                    className={
-                      isDisabled ? disabledButtonClasses : primaryButtonClasses
-                    }
-                    {...motionProps}
-                  >
-                    <span className="text-base leading-none">↗</span>
-                    <span>{action.label}</span>
-                    <span
-                      className={
-                        isDisabled ? disabledDotClasses : buttonDotClasses
-                      }
-                    />
-                  </motion.button>
-                );
-              })}
-            </div>
-          </motion.div>
-        </section>
-
-        <section
-          id="about"
-          ref={aboutRef}
-          className="relative px-6 pt-16 pb-24 sm:px-12"
-        >
-          <motion.div
-            initial={{ opacity: 0, y: 48 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, amount: 0.3 }}
-            transition={{ duration: 0.75, ease: "easeOut" }}
-            className="relative mx-auto w-full max-w-5xl overflow-hidden rounded-[46px] border border-white/12 bg-linear-to-br from-white/95 via-sky-50/95 to-blue-100/90 text-slate-900 shadow-[0_40px_120px_-55px_rgba(46,115,255,0.65)]"
-            style={{ y: aboutRef ? statsYSpring : undefined }}
-          >
-            <div className="pointer-events-none absolute inset-0">
-              <div className="absolute -top-20 left-10 h-64 w-64 rotate-12 rounded-[36px] bg-white/60 blur-3xl" />
-              <div className="absolute -bottom-28 right-10 h-72 w-72 -rotate-6 rounded-[36px] bg-sky-200/70 blur-[120px]" />
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.28),transparent_55%)]" />
-            </div>
-
-            <div className="relative grid gap-14 px-8 py-14 sm:px-16 sm:py-20">
-              <div className="max-w-3xl">
-                <h2 className="text-4xl font-semibold leading-tight tracking-tight text-slate-900 sm:text-5xl md:text-[3.4rem]">
-                  Where Healthcare
-                  <span className="text-blue-600">.</span>
-                  <br className="hidden sm:block" />
-                  Meets Clarity
-                  <span className="text-blue-500">.</span>
-                </h2>
-                <p className="mt-6 text-base leading-relaxed text-slate-600">
-                  At Clarity, we bring the worlds of Machine Learning and
-                  Artificial Intelligence together to redefine how medical
-                  imaging is understood. Our platform is designed to assist
-                  radiologists and doctors by offering fast, accurate, and
-                  explainable diagnostic insights from chest X-rays.
-                </p>
-                <p className="mt-4 text-base leading-relaxed text-slate-600">
-                  We believe that technology should not replace expertise — it
-                  should empower it. With every prediction, visualization, and
-                  generated report, Clarity aims to enhance medical
-                  decision-making and make diagnostics more transparent,
-                  efficient, and reliable.
-                </p>
-                <p className="mt-4 text-base leading-relaxed text-slate-600">
-                  Our goal is simple: to make healthcare smarter, diagnostics
-                  clearer, and patient outcomes better — one image at a time.
-                </p>
-                <p className="mt-6 text-base leading-relaxed text-slate-600">
-                  Clarity isn’t just a project — it’s a vision to make medical
-                  intelligence accessible, understandable, and trustworthy for
-                  every healthcare professional.
-                </p>
-              </div>
-
-              <div className="relative rounded-[36px] border border-slate-900/20 bg-[#0a1635]/95 p-8 text-white shadow-[0_32px_90px_-55px_rgba(10,23,52,0.9)] backdrop-blur-xl sm:p-10">
-                <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="max-w-sm">
-                    <h3 className="text-3xl font-semibold text-white">
-                      Our Core Values
-                    </h3>
-                    <p className="mt-3 text-sm text-white/70">
-                      At Clarity, our foundation rests on four strong pillars
-                      that guide every innovation we create.
-                    </p>
-                  </div>
-                  <motion.span
-                    initial={{ opacity: 0, y: 8 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true, amount: 0.4 }}
-                    transition={{ delay: 0.2, duration: 0.5, ease: "easeOut" }}
-                    className="inline-flex items-center gap-2 rounded-full border border-blue-300/30 bg-blue-500/15 px-4 py-2 text-xs font-semibold uppercase tracking-[0.28em] text-blue-200"
-                  >
-                    Trusted by clinicians
-                  </motion.span>
-                </div>
-
-                <div className="mt-8 grid gap-4 sm:grid-cols-2">
-                  {coreValues.map((item, index) => (
-                    <motion.div
-                      key={item.title}
-                      initial={{ opacity: 0, y: 24 }}
-                      whileInView={{ opacity: 1, y: 0 }}
-                      viewport={{ once: true, amount: 0.25 }}
-                      transition={{
-                        delay: index * 0.12,
-                        duration: 0.45,
-                        ease: [0.22, 0.84, 0.44, 1],
-                      }}
-                      className="flex items-start gap-4 rounded-3xl border border-white/10 bg-white/10 p-5 text-left transition hover:border-blue-300/40 hover:bg-blue-500/10"
-                    >
-                      <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-500/20 text-blue-200">
-                        {item.icon}
-                      </span>
-                      <div>
-                        <h4 className="text-base font-semibold text-white">
-                          {item.title}
-                        </h4>
-                        <p className="mt-1 text-xs leading-relaxed text-white/70">
-                          {item.description}
-                        </p>
-                      </div>
-                    </motion.div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        </section>
-      </div>
-      {/* Slide viewer: lightbox-style interactive presentation for disease cards */}
-      {activeSlide !== null ? (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6"
-          onClick={() => setActiveSlide(null)}
-        >
-          <motion.div
-            initial={{ scale: 0.96, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.96, opacity: 0 }}
-            transition={{ duration: 0.28, ease: "easeOut" }}
-            onClick={(e) => e.stopPropagation()}
-            className="relative max-w-3xl rounded-3xl bg-[#061025]/95 p-8 text-white shadow-2xl"
-          >
-            <div className="flex items-start justify-between gap-6">
-              <div className="flex items-center gap-4">
-                <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-white/12 p-3 text-2xl">
-                  {renderDiseaseIcon(diseaseCards[activeSlide].id, "h-6 w-6")}
-                </div>
-                <div>
-                  <h3 className="text-2xl font-semibold">
-                    {diseaseCards[activeSlide].title}
-                  </h3>
-                  <p className="mt-1 text-sm text-white/70">
-                    {diseaseCards[activeSlide].description}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setActiveSlide(
-                      (s) => (s - 1 + diseaseCards.length) % diseaseCards.length
-                    )
-                  }
-                  className="rounded-full bg-white/6 p-2 text-white/80 hover:bg-white/12"
-                  aria-label="Previous"
-                >
-                  ←
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setActiveSlide((s) => (s + 1) % diseaseCards.length)
-                  }
-                  className="rounded-full bg-white/6 p-2 text-white/80 hover:bg-white/12"
-                  aria-label="Next"
-                >
-                  →
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveSlide(null)}
-                  className="ml-3 rounded-full bg-white/6 p-2 text-white/80 hover:bg-white/12"
-                  aria-label="Close"
-                >
-                  ✕
-                </button>
-              </div>
-            </div>
-
-            <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2">
-              <div className="rounded-2xl border border-white/6 bg-black/40 p-4">
-                <img
-                  src={`/iStock-115987328.webp`}
-                  alt={diseaseCards[activeSlide].title}
-                  className="h-56 w-full object-cover rounded-lg"
-                />
-              </div>
-              <div>
-                <h4 className="text-lg font-semibold">Details</h4>
-                <p className="mt-3 text-sm text-white/70">
-                  {diseaseCards[activeSlide].description}
-                </p>
-                <div className="mt-4 flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => alert("Placeholder: open prediction flow")}
-                    className="inline-flex items-center gap-2 rounded-full bg-cyan-500 px-4 py-2 text-sm font-semibold text-white"
-                  >
-                    Open in Clarity
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveSlide(null)}
-                    className="inline-flex items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-sm text-white/70"
-                  >
-                    Close
-                  </button>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        </motion.div>
-      ) : null}
-      <Footer />
-    </div>
+    </SmoothScroll>
   );
 }
 

@@ -9,6 +9,9 @@ import PageBackdrop from "../components/ui/PageBackdrop.jsx";
 import ScrollIndicator from "../components/ui/ScrollIndicator.jsx";
 import useScrollToTop from "../hooks/useScrollToTop.js";
 import { MODEL_LIST } from "../utils/modelUtils.js";
+import MagneticButton from "../components/ui/MagneticButton.jsx";
+import NoiseOverlay from "../components/ui/NoiseOverlay.jsx";
+import SmoothScroll from "../components/ui/SmoothScroll.jsx";
 
 import {
   datasetMeta,
@@ -226,66 +229,84 @@ const DataPage = () => {
   );
 
   return (
-    <Motion.div
-      className="relative min-h-screen overflow-x-hidden bg-slate-950 text-slate-100"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.4 }}
-    >
-      <ScrollIndicator className="right-3 sm:right-5 md:right-7 lg:right-12" />
-      <AnimatedBackground />
-      <PageBackdrop />
-      <BackgroundGrid className="opacity-50" opacity={0.06} />
-      <div className="relative z-10 flex min-h-screen flex-col px-4 pb-24 pt-10 sm:px-8">
-        <header className="px-6 pt-8 sm:px-10">
-          <PrimaryNav />
-        </header>
+    <SmoothScroll>
+      <Motion.div
+        className="relative min-h-screen overflow-x-hidden bg-slate-950 text-slate-100"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.4 }}
+      >
+        <ScrollIndicator className="right-3 sm:right-5 md:right-7 lg:right-12" />
+        <AnimatedBackground />
+        <PageBackdrop />
+        <BackgroundGrid className="opacity-50" opacity={0.06} />
 
-        <main className="flex-1">
-          <div className="mx-auto flex w-full max-w-6xl flex-col gap-16 px-6 pt-10 sm:px-10 lg:px-12">
-            <div className="relative text-center">
-              <Motion.h1
-                initial={{ opacity: 0, y: 32, filter: "blur(18px)" }}
-                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                transition={{ delay: 0.1, duration: 0.7, ease: "easeOut" }}
-                style={{ willChange: "transform, filter" }}
-                className="mx-auto max-w-3xl text-5xl font-semibold leading-tight tracking-[-0.03em] text-white sm:text-6xl md:text-7xl"
-              >
-                <span className="gradient-flow-text block text-transparent bg-clip-text bg-[linear-gradient(120deg,#040b1a,#0ea5e9,#1e3a8a,#0ea5e9)]">
-                  Dataset Overview
-                </span>
-              </Motion.h1>
-              <Motion.p
-                initial={{ opacity: 0, y: 24, filter: "blur(16px)" }}
-                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                transition={{ duration: 0.6, delay: 0.25, ease: "easeOut" }}
-                style={{ willChange: "transform, filter" }}
-                className="mx-auto mt-6 max-w-2xl text-lg italic text-white/70 sm:text-xl"
-              >
-                Explore the NIH ChestX-ray14 dataset and model performance
-                metrics
-              </Motion.p>
+        <NoiseOverlay opacity={0.04} />
+
+        {/* Aurora Glow Background */}
+        <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+          <div className="absolute -top-[20%] left-1/2 h-[80vh] w-[80vw] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(14,165,233,0.15),transparent_70%)] blur-[100px]" />
+          <div
+            className="absolute top-[10%] left-[20%] h-[40vh] w-[40vw] rounded-full bg-[radial-gradient(circle,rgba(99,102,241,0.12),transparent_70%)] blur-[80px] animate-pulse"
+            style={{ animationDuration: "8s" }}
+          />
+          <div
+            className="absolute top-[15%] right-[20%] h-[35vh] w-[35vw] rounded-full bg-[radial-gradient(circle,rgba(56,189,248,0.12),transparent_70%)] blur-[80px] animate-pulse"
+            style={{ animationDuration: "10s" }}
+          />
+        </div>
+
+        <div className="relative z-10 flex min-h-screen flex-col px-4 pb-24 pt-10 sm:px-8">
+          <header className="px-6 pt-8 sm:px-10">
+            <PrimaryNav />
+          </header>
+
+          <main className="flex-1">
+            <div className="mx-auto flex w-full max-w-6xl flex-col gap-16 px-6 pt-10 sm:px-10 lg:px-12">
+              <div className="relative text-center">
+                <Motion.h1
+                  initial={{ opacity: 0, y: 32, filter: "blur(18px)" }}
+                  animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                  transition={{ delay: 0.1, duration: 0.7, ease: "easeOut" }}
+                  style={{ willChange: "transform, filter" }}
+                  className="mx-auto max-w-3xl text-5xl font-semibold leading-tight tracking-[-0.03em] text-white sm:text-6xl md:text-7xl"
+                >
+                  <span className="gradient-flow-text block text-transparent bg-clip-text bg-[linear-gradient(120deg,#040b1a,#0ea5e9,#1e3a8a,#0ea5e9)]">
+                    Dataset Overview
+                  </span>
+                </Motion.h1>
+                <Motion.p
+                  initial={{ opacity: 0, y: 24, filter: "blur(16px)" }}
+                  animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                  transition={{ duration: 0.6, delay: 0.25, ease: "easeOut" }}
+                  style={{ willChange: "transform, filter" }}
+                  className="mx-auto mt-6 max-w-2xl text-lg italic text-white/70 sm:text-xl"
+                >
+                  Explore the NIH ChestX-ray14 dataset and model performance
+                  metrics
+                </Motion.p>
+              </div>
+
+              <DatasetIntro />
+              <DatasetBreakdown />
+              <ModelSelector
+                activeModel={activeModel}
+                onChange={setActiveModel}
+              />
+              <MetricsSection
+                activeMetric={activeMetric}
+                onMetricChange={setActiveMetric}
+                modelKeys={modelKeys}
+                radarSeries={radarSeries}
+              />
             </div>
+          </main>
+        </div>
 
-            <DatasetIntro />
-            <DatasetBreakdown />
-            <ModelSelector
-              activeModel={activeModel}
-              onChange={setActiveModel}
-            />
-            <MetricsSection
-              activeMetric={activeMetric}
-              onMetricChange={setActiveMetric}
-              modelKeys={modelKeys}
-              radarSeries={radarSeries}
-            />
-          </div>
-        </main>
-      </div>
-
-      <Footer />
-    </Motion.div>
+        <Footer />
+      </Motion.div>
+    </SmoothScroll>
   );
 };
 
@@ -1038,7 +1059,7 @@ const ModelSelector = ({ activeModel, onChange }) => {
           const theme = MODEL_THEMES[filter.key] ?? MODEL_THEMES.both;
           const metrics = buildCardMetrics(filter.key);
           return (
-            <Motion.button
+            <MagneticButton
               key={filter.key}
               type="button"
               onClick={() => onChange(filter.key)}
@@ -1049,8 +1070,9 @@ const ModelSelector = ({ activeModel, onChange }) => {
                   ? "ring-2 ring-sky-400/70 ring-offset-2 ring-offset-slate-950"
                   : "hover:border-sky-400/40"
               }`}
-              whileHover={{ y: -6 }}
             >
+              {/* Gradient Border Overlay */}
+              <div className="pointer-events-none absolute inset-0 rounded-2xl p-[1px] bg-gradient-to-br from-white/10 to-transparent opacity-50" />
               <span
                 className={`inline-flex h-2 w-2 rounded-full ${theme.dot}`}
               />
@@ -1067,7 +1089,7 @@ const ModelSelector = ({ activeModel, onChange }) => {
                 <StatLine label="AUC" value={metrics.auc} />
                 <StatLine label="Accuracy" value={metrics.accuracy} />
               </div>
-            </Motion.button>
+            </MagneticButton>
           );
         })}
       </div>
@@ -1172,7 +1194,7 @@ function MetricsSection({
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {METRIC_KEYS.map((metricKey) => (
-              <button
+              <MagneticButton
                 key={metricKey}
                 type="button"
                 onClick={() => onMetricChange(metricKey)}
@@ -1183,7 +1205,7 @@ function MetricsSection({
                 }`}
               >
                 {METRIC_LABELS[metricKey]}
-              </button>
+              </MagneticButton>
             ))}
           </div>
         </div>

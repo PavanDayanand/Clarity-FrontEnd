@@ -11,6 +11,9 @@ import ScrollIndicator from "../components/ui/ScrollIndicator.jsx";
 import BackgroundGrid from "../components/ui/BackgroundGrid.jsx";
 import PageBackdrop from "../components/ui/PageBackdrop.jsx";
 import { usePopup } from "../components/ui/PopupProvider.jsx";
+import MagneticButton from "../components/ui/MagneticButton.jsx";
+import NoiseOverlay from "../components/ui/NoiseOverlay.jsx";
+import SmoothScroll from "../components/ui/SmoothScroll.jsx";
 import {
   generateHeatmap,
   getAvailableLayers,
@@ -596,506 +599,527 @@ function GradcamPage() {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#031029] text-white">
-      <ScrollIndicator className="right-3 sm:right-5 md:right-7 lg:right-12" />
-      <PageBackdrop variant="predict" />
-      <BackgroundGrid className="z-10 opacity-20" />
+    <SmoothScroll>
+      <div className="relative min-h-screen overflow-hidden bg-[#031029] text-white">
+        <ScrollIndicator className="right-3 sm:right-5 md:right-7 lg:right-12" />
+        <PageBackdrop variant="predict" />
+        <BackgroundGrid className="z-10 opacity-20" />
 
-      <Motion.div
-        className="pointer-events-none absolute inset-0 z-20 backdrop-blur-[1.5px]"
-        style={entryOverlayStyle}
-        initial={{ opacity: 0.4 }}
-        animate={{ opacity: 0 }}
-        transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-      />
-
-      <AnimatePresence>
-        {isTransitioning ? (
-          <Motion.div
-            key="gradcam-exit-overlay"
-            className="pointer-events-auto absolute inset-0 z-30 backdrop-blur-[1.5px]"
-            style={exitOverlayStyle}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 0.38 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.55, ease: [0.25, 1, 0.5, 1] }}
-            onAnimationComplete={() => {
-              const pending = pendingNavigation.current;
-              if (pending) {
-                pendingNavigation.current = null;
-                pending();
-                return;
-              }
-              setIsTransitioning(false);
-            }}
+        <NoiseOverlay opacity={0.04} />
+        {/* Aurora Glow Background */}
+        <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+          <div className="absolute -top-[20%] left-1/2 h-[80vh] w-[80vw] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(14,165,233,0.15),transparent_70%)] blur-[100px]" />
+          <div
+            className="absolute top-[10%] left-[20%] h-[40vh] w-[40vw] rounded-full bg-[radial-gradient(circle,rgba(99,102,241,0.12),transparent_70%)] blur-[80px] animate-pulse"
+            style={{ animationDuration: "8s" }}
           />
-        ) : null}
-      </AnimatePresence>
+          <div
+            className="absolute top-[15%] right-[20%] h-[35vh] w-[35vw] rounded-full bg-[radial-gradient(circle,rgba(56,189,248,0.12),transparent_70%)] blur-[80px] animate-pulse"
+            style={{ animationDuration: "10s" }}
+          />
+        </div>
 
-      <div className="relative z-10 flex min-h-screen flex-col px-4 pb-24 pt-10 sm:px-8">
-        <header className="px-6 pt-8 sm:px-10">
-          <PrimaryNav onNavigate={handleNavigation} maxWidthClass="max-w-5xl" />
-        </header>
+        <Motion.div
+          className="pointer-events-none absolute inset-0 z-20 backdrop-blur-[1.5px]"
+          style={entryOverlayStyle}
+          initial={{ opacity: 0.4 }}
+          animate={{ opacity: 0 }}
+          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+        />
 
-        <main className="flex-1">
-          <Motion.section
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ ...smoothTransition, delay: 0.1 }}
-            className="mx-auto w-full max-w-3xl pt-16 text-center"
-          >
-            <Motion.h1
-              initial={{ opacity: 0, y: 24 }}
+        <AnimatePresence>
+          {isTransitioning ? (
+            <Motion.div
+              key="gradcam-exit-overlay"
+              className="pointer-events-auto absolute inset-0 z-30 backdrop-blur-[1.5px]"
+              style={exitOverlayStyle}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.38 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.55, ease: [0.25, 1, 0.5, 1] }}
+              onAnimationComplete={() => {
+                const pending = pendingNavigation.current;
+                if (pending) {
+                  pendingNavigation.current = null;
+                  pending();
+                  return;
+                }
+                setIsTransitioning(false);
+              }}
+            />
+          ) : null}
+        </AnimatePresence>
+
+        <div className="relative z-10 flex min-h-screen flex-col px-4 pb-24 pt-10 sm:px-8">
+          <header className="px-6 pt-8 sm:px-10">
+            <PrimaryNav
+              onNavigate={handleNavigation}
+              maxWidthClass="max-w-5xl"
+            />
+          </header>
+
+          <main className="flex-1">
+            <Motion.section
+              initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ ...smoothTransition, delay: 0.15 }}
-              className="text-4xl font-semibold tracking-tight sm:text-5xl"
+              transition={{ ...smoothTransition, delay: 0.1 }}
+              className="mx-auto w-full max-w-3xl pt-16 text-center"
             >
-              <span className="gradient-flow-text text-transparent bg-clip-text bg-[linear-gradient(120deg,#06183a,#0ea5e9,#1e3a8a,#0ea5e9)]">
-                Heat Map Visualization
-              </span>
-            </Motion.h1>
-            <Motion.p
-              initial={{ opacity: 0, y: 24 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ ...smoothTransition, delay: 0.25 }}
-              className="mt-5 text-base italic text-white/70 sm:text-xl"
-            >
-              The Heat Map highlights the regions in the X-ray where the model
-              focuses while predicting the disease.
-            </Motion.p>
-          </Motion.section>
+              <Motion.h1
+                initial={{ opacity: 0, y: 24 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ ...smoothTransition, delay: 0.15 }}
+                className="text-4xl font-semibold tracking-tight sm:text-5xl"
+              >
+                <span className="gradient-flow-text text-transparent bg-clip-text bg-[linear-gradient(120deg,#06183a,#0ea5e9,#1e3a8a,#0ea5e9)]">
+                  Heat Map Visualization
+                </span>
+              </Motion.h1>
+              <Motion.p
+                initial={{ opacity: 0, y: 24 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ ...smoothTransition, delay: 0.25 }}
+                className="mt-5 text-base italic text-white/70 sm:text-xl"
+              >
+                The Heat Map highlights the regions in the X-ray where the model
+                focuses while predicting the disease.
+              </Motion.p>
+            </Motion.section>
 
-          <Motion.section
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ ...smoothTransition, delay: 0.2 }}
-            className="mt-14 mx-auto flex w-full max-w-6xl flex-col gap-8 px-2 sm:px-6 lg:flex-row"
-          >
-            <div className="flex w-full flex-col gap-6 rounded-[34px] border border-white/10 bg-white/5 px-5 py-8 sm:px-7 backdrop-blur-2xl">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="text-left">
-                  <h2 className="text-xl font-semibold text-white/90 sm:text-2xl">
-                    Imaging Explorer
-                  </h2>
-                  <p className="mt-2 text-sm italic text-white/65 sm:text-base">
-                    Toggle between the clinician upload and Heat Map response
-                    for {fileName}.
-                  </p>
+            <Motion.section
+              initial={{ opacity: 0, y: 40 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ ...smoothTransition, delay: 0.2 }}
+              className="mt-14 mx-auto flex w-full max-w-6xl flex-col gap-8 px-2 sm:px-6 lg:flex-row"
+            >
+              <div className="flex w-full flex-col gap-6 rounded-[34px] border border-white/10 bg-white/5 px-5 py-8 sm:px-7 backdrop-blur-2xl">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="text-left">
+                    <h2 className="text-xl font-semibold text-white/90 sm:text-2xl">
+                      Imaging Explorer
+                    </h2>
+                    <p className="mt-2 text-sm italic text-white/65 sm:text-base">
+                      Toggle between the clinician upload and Heat Map response
+                      for {fileName}.
+                    </p>
+                  </div>
+                  <LayoutGroup id="gradcam-toggle">
+                    <div className="inline-flex items-center rounded-full bg-white/10 p-1">
+                      {[
+                        { id: "original", label: "Original" },
+                        { id: "heatmap", label: "Heat Map" },
+                      ].map((option) => {
+                        const isActive = viewMode === option.id;
+                        return (
+                          <button
+                            key={option.id}
+                            type="button"
+                            onClick={() => setViewMode(option.id)}
+                            className={`relative rounded-full px-5 py-2 text-xs font-semibold transition whitespace-nowrap ${
+                              isActive
+                                ? "text-[#1ccad8]"
+                                : "text-white/60 hover:text-white/80"
+                            }`}
+                          >
+                            {isActive ? (
+                              <Motion.span
+                                layoutId="toggle-pill"
+                                className="absolute inset-0 rounded-full bg-white/10"
+                                transition={{
+                                  type: "spring",
+                                  stiffness: 320,
+                                  damping: 28,
+                                }}
+                              />
+                            ) : null}
+                            <span className="relative z-10">
+                              {option.label}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </LayoutGroup>
                 </div>
-                <LayoutGroup id="gradcam-toggle">
-                  <div className="inline-flex items-center rounded-full bg-white/10 p-1">
-                    {[
-                      { id: "original", label: "Original" },
-                      { id: "heatmap", label: "Heat Map" },
-                    ].map((option) => {
-                      const isActive = viewMode === option.id;
+
+                <div className="grid gap-4 pt-2 sm:grid-cols-2">
+                  <label className="flex flex-col gap-2 text-left text-sm font-semibold text-white/65">
+                    <span className="text-sm font-medium text-white/80">
+                      Method
+                    </span>
+                    <div className="relative">
+                      <select
+                        value={selectedMethod}
+                        onChange={(event) => {
+                          setSelectedMethod(event.target.value);
+                          setHeatmapError(null);
+                        }}
+                        disabled={isHeatmapLoading}
+                        className="w-full appearance-none rounded-2xl border border-white/10 bg-black/50 px-4 py-3 text-sm font-semibold text-white/85 outline-none transition hover:border-cyan-300/40 focus:border-cyan-300 focus:ring-2 focus:ring-cyan-500/40 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {methodOptionsToRender.map((method) => (
+                          <option key={method} value={method}>
+                            {formatMethodLabel(method)}
+                          </option>
+                        ))}
+                      </select>
+                      <svg
+                        className="pointer-events-none absolute right-4 top-1/2 h-3 w-3 -translate-y-1/2 text-white/70"
+                        viewBox="0 0 12 12"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="M3 5l3 3 3-3"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </div>
+                  </label>
+                  <label className="flex flex-col gap-2 text-left text-sm font-semibold text-white/65">
+                    <span className="text-sm font-medium text-white/80">
+                      Layer
+                    </span>
+                    <div className="relative">
+                      <select
+                        value={selectedLayer}
+                        onChange={(event) => {
+                          setSelectedLayer(event.target.value);
+                          setHeatmapError(null);
+                        }}
+                        disabled={isHeatmapLoading}
+                        className="w-full appearance-none rounded-2xl border border-white/10 bg-black/50 px-4 py-3 text-sm font-semibold text-white/85 outline-none transition hover:border-cyan-300/40 focus:border-cyan-300 focus:ring-2 focus:ring-cyan-500/40 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <option value="">Auto (recommended)</option>
+                        {layerOptionsToRender.map((layer) => (
+                          <option key={layer.value} value={layer.value}>
+                            {layer.label}
+                          </option>
+                        ))}
+                      </select>
+                      <svg
+                        className="pointer-events-none absolute right-4 top-1/2 h-3 w-3 -translate-y-1/2 text-white/70"
+                        viewBox="0 0 12 12"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="M3 5l3 3 3-3"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </div>
+                  </label>
+                </div>
+
+                <div className="relative flex w-full items-center justify-center overflow-hidden rounded-[28px] border border-white/5 bg-black/60 px-4 py-6 shadow-[0_50px_110px_-60px_rgba(37,99,235,0.6)]">
+                  <AnimatePresence mode="wait">
+                    {viewMode === "original" ? (
+                      <Motion.img
+                        key="original"
+                        src={originalImage}
+                        alt="Original chest radiograph"
+                        className="h-auto w-full max-w-2xl object-contain"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.5, ease: "easeOut" }}
+                      />
+                    ) : (
+                      <Motion.div
+                        key="heatmap"
+                        className="relative flex h-full w-full items-center justify-center"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.5, ease: "easeOut" }}
+                      >
+                        <img
+                          src={effectiveHeatmap}
+                          alt="Heat Map overlay"
+                          className="h-auto w-full max-w-2xl object-contain"
+                        />
+                        {isHeatmapLoading ? (
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/55 backdrop-blur-sm">
+                            <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/30 border-t-cyan-300" />
+                          </div>
+                        ) : null}
+                        {isSyntheticHeatmap ? (
+                          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(252,70,107,0.55),rgba(56,189,248,0.2),transparent_78%)] mix-blend-screen" />
+                        ) : null}
+                        <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-black/30 via-transparent to-transparent" />
+                      </Motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={handleDownloadImage}
+                    className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-5 py-2 text-sm font-semibold text-white/85 transition hover:border-cyan-300/40 hover:bg-white/15"
+                  >
+                    <span className="inline-flex h-2 w-2 rounded-full bg-cyan-300" />
+                    Download {viewMode === "heatmap" ? "Heat Map" : "Original"}
+                  </button>
+                </div>
+
+                {heatmapError ? (
+                  <p className="text-sm font-medium text-rose-300">
+                    {heatmapError}
+                  </p>
+                ) : null}
+
+                <div className="grid gap-4 rounded-3xl border border-white/10 bg-white/5 p-5 text-xs text-white/60 sm:grid-cols-2 sm:text-sm">
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-white/70">Model</p>
+                    <p className="text-sm font-semibold text-white/85">
+                      {activeModelLabel}
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-white/70">Method</p>
+                    <p className="text-sm font-semibold text-white/85">
+                      {formatMethodLabel(
+                        selectedMethod || DEFAULT_HEATMAP_METHOD
+                      )}
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-white/70">Layer</p>
+                    <p className="text-sm font-semibold text-white/85">
+                      {selectedLayerLabel}
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-white/70">
+                      Peak Focus
+                    </p>
+                    <p className="text-sm font-semibold text-white/85">
+                      {topHeatmapDisease ? (
+                        <span>
+                          {topHeatmapDisease}
+                          {topHeatmapPercent != null
+                            ? ` · ${topHeatmapPercent}%`
+                            : ""}
+                        </span>
+                      ) : (
+                        <span>Pending</span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <Motion.div
+                initial={{ opacity: 0, y: 40 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ ...smoothTransition, delay: 0.25 }}
+                className="flex w-full flex-col gap-6 rounded-[34px] border border-white/10 bg-white/5 p-8 backdrop-blur-2xl"
+              >
+                <div className="rounded-[28px] border border-white/10 bg-black/45 p-5">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <h3 className="text-lg font-semibold text-white/90">
+                        Model selector
+                      </h3>
+                      <p className="mt-1 text-xs text-white/60">
+                        Pick a network to regenerate Heat Map focus.
+                      </p>
+                    </div>
+                    <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.32em] text-white/60">
+                      Active · {activeModelLabel}
+                    </span>
+                  </div>
+                  <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                    {modelOptions.map((option) => {
+                      const isActive = option.id === activeModelId;
                       return (
                         <button
                           key={option.id}
                           type="button"
-                          onClick={() => setViewMode(option.id)}
-                          className={`relative rounded-full px-5 py-2 text-xs font-semibold transition whitespace-nowrap ${
+                          onClick={() => handleModelChange(option.id)}
+                          className={`group relative flex h-full flex-col gap-3 rounded-3xl border px-5 py-4 text-left transition ${
                             isActive
-                              ? "text-[#1ccad8]"
-                              : "text-white/60 hover:text-white/80"
+                              ? "border-cyan-300/60 bg-[#081632]/95 shadow-[0_50px_110px_-70px_rgba(14,165,233,0.6)]"
+                              : "border-white/10 bg-white/5 hover:border-cyan-200/50 hover:bg-white/10"
                           }`}
                         >
-                          {isActive ? (
-                            <Motion.span
-                              layoutId="toggle-pill"
-                              className="absolute inset-0 rounded-full bg-white/10"
-                              transition={{
-                                type: "spring",
-                                stiffness: 320,
-                                damping: 28,
-                              }}
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="text-sm font-semibold text-white/85">
+                              {option.label}
+                            </span>
+                            <span
+                              className={`h-2 w-2 rounded-full transition ${
+                                isActive ? "bg-cyan-300" : "bg-white/30"
+                              }`}
                             />
-                          ) : null}
-                          <span className="relative z-10">{option.label}</span>
+                          </div>
+                          <p className="text-xs text-white/60">
+                            {option.tagline}
+                          </p>
+                          <div className="flex flex-wrap items-center gap-2 pt-1 text-[0.6rem] uppercase tracking-[0.28em]">
+                            {option.badges.map((badge) => (
+                              <span
+                                key={`${option.id}-${badge}`}
+                                className={`rounded-full border px-3 py-1 font-semibold transition ${
+                                  isActive
+                                    ? "border-cyan-200/60 text-cyan-200"
+                                    : "border-white/12 text-white/50"
+                                }`}
+                              >
+                                {badge}
+                              </span>
+                            ))}
+                          </div>
+                          <span
+                            className={`block pt-1 text-[0.65rem] uppercase tracking-[0.28em] transition ${
+                              isActive ? "text-cyan-200" : "text-white/45"
+                            }`}
+                          >
+                            {option.footnote}
+                          </span>
                         </button>
                       );
                     })}
                   </div>
-                </LayoutGroup>
-              </div>
-
-              <div className="grid gap-4 pt-2 sm:grid-cols-2">
-                <label className="flex flex-col gap-2 text-left text-sm font-semibold text-white/65">
-                  <span className="text-sm font-medium text-white/80">
-                    Method
-                  </span>
-                  <div className="relative">
-                    <select
-                      value={selectedMethod}
-                      onChange={(event) => {
-                        setSelectedMethod(event.target.value);
-                        setHeatmapError(null);
-                      }}
-                      disabled={isHeatmapLoading}
-                      className="w-full appearance-none rounded-2xl border border-white/10 bg-black/50 px-4 py-3 text-sm font-semibold text-white/85 outline-none transition hover:border-cyan-300/40 focus:border-cyan-300 focus:ring-2 focus:ring-cyan-500/40 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {methodOptionsToRender.map((method) => (
-                        <option key={method} value={method}>
-                          {formatMethodLabel(method)}
-                        </option>
-                      ))}
-                    </select>
-                    <svg
-                      className="pointer-events-none absolute right-4 top-1/2 h-3 w-3 -translate-y-1/2 text-white/70"
-                      viewBox="0 0 12 12"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <path
-                        d="M3 5l3 3 3-3"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  </div>
-                </label>
-                <label className="flex flex-col gap-2 text-left text-sm font-semibold text-white/65">
-                  <span className="text-sm font-medium text-white/80">
-                    Layer
-                  </span>
-                  <div className="relative">
-                    <select
-                      value={selectedLayer}
-                      onChange={(event) => {
-                        setSelectedLayer(event.target.value);
-                        setHeatmapError(null);
-                      }}
-                      disabled={isHeatmapLoading}
-                      className="w-full appearance-none rounded-2xl border border-white/10 bg-black/50 px-4 py-3 text-sm font-semibold text-white/85 outline-none transition hover:border-cyan-300/40 focus:border-cyan-300 focus:ring-2 focus:ring-cyan-500/40 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      <option value="">Auto (recommended)</option>
-                      {layerOptionsToRender.map((layer) => (
-                        <option key={layer.value} value={layer.value}>
-                          {layer.label}
-                        </option>
-                      ))}
-                    </select>
-                    <svg
-                      className="pointer-events-none absolute right-4 top-1/2 h-3 w-3 -translate-y-1/2 text-white/70"
-                      viewBox="0 0 12 12"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <path
-                        d="M3 5l3 3 3-3"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  </div>
-                </label>
-              </div>
-
-              <div className="relative flex w-full items-center justify-center overflow-hidden rounded-[28px] border border-white/5 bg-black/60 px-4 py-6 shadow-[0_50px_110px_-60px_rgba(37,99,235,0.6)]">
-                <AnimatePresence mode="wait">
-                  {viewMode === "original" ? (
-                    <Motion.img
-                      key="original"
-                      src={originalImage}
-                      alt="Original chest radiograph"
-                      className="h-auto w-full max-w-2xl object-contain"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      transition={{ duration: 0.5, ease: "easeOut" }}
-                    />
-                  ) : (
-                    <Motion.div
-                      key="heatmap"
-                      className="relative flex h-full w-full items-center justify-center"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      transition={{ duration: 0.5, ease: "easeOut" }}
-                    >
-                      <img
-                        src={effectiveHeatmap}
-                        alt="Heat Map overlay"
-                        className="h-auto w-full max-w-2xl object-contain"
-                      />
-                      {isHeatmapLoading ? (
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/55 backdrop-blur-sm">
-                          <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/30 border-t-cyan-300" />
-                        </div>
-                      ) : null}
-                      {isSyntheticHeatmap ? (
-                        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(252,70,107,0.55),rgba(56,189,248,0.2),transparent_78%)] mix-blend-screen" />
-                      ) : null}
-                      <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-black/30 via-transparent to-transparent" />
-                    </Motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-
-              <div className="flex justify-end">
-                <button
-                  type="button"
-                  onClick={handleDownloadImage}
-                  className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-5 py-2 text-sm font-semibold text-white/85 transition hover:border-cyan-300/40 hover:bg-white/15"
-                >
-                  <span className="inline-flex h-2 w-2 rounded-full bg-cyan-300" />
-                  Download {viewMode === "heatmap" ? "Heat Map" : "Original"}
-                </button>
-              </div>
-
-              {heatmapError ? (
-                <p className="text-sm font-medium text-rose-300">
-                  {heatmapError}
-                </p>
-              ) : null}
-
-              <div className="grid gap-4 rounded-3xl border border-white/10 bg-white/5 p-5 text-xs text-white/60 sm:grid-cols-2 sm:text-sm">
-                <div className="space-y-1">
-                  <p className="text-xs font-medium text-white/70">Model</p>
-                  <p className="text-sm font-semibold text-white/85">
+                </div>
+                <div className="flex items-center justify-between">
+                  <h2 className="text-xl font-semibold text-white/90 sm:text-2xl">
+                    Model Prediction Graph
+                  </h2>
+                  <span className="rounded-full border border-white/10 bg-white/10 px-4 py-1 text-xs text-white/70">
                     {activeModelLabel}
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs font-medium text-white/70">Method</p>
-                  <p className="text-sm font-semibold text-white/85">
-                    {formatMethodLabel(
-                      selectedMethod || DEFAULT_HEATMAP_METHOD
-                    )}
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs font-medium text-white/70">Layer</p>
-                  <p className="text-sm font-semibold text-white/85">
-                    {selectedLayerLabel}
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs font-medium text-white/70">
-                    Peak Focus
-                  </p>
-                  <p className="text-sm font-semibold text-white/85">
-                    {topHeatmapDisease ? (
-                      <span>
-                        {topHeatmapDisease}
-                        {topHeatmapPercent != null
-                          ? ` · ${topHeatmapPercent}%`
-                          : ""}
-                      </span>
-                    ) : (
-                      <span>Pending</span>
-                    )}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <Motion.div
-              initial={{ opacity: 0, y: 40 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ ...smoothTransition, delay: 0.25 }}
-              className="flex w-full flex-col gap-6 rounded-[34px] border border-white/10 bg-white/5 p-8 backdrop-blur-2xl"
-            >
-              <div className="rounded-[28px] border border-white/10 bg-black/45 p-5">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <h3 className="text-lg font-semibold text-white/90">
-                      Model selector
-                    </h3>
-                    <p className="mt-1 text-xs text-white/60">
-                      Pick a network to regenerate Heat Map focus.
-                    </p>
-                  </div>
-                  <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.32em] text-white/60">
-                    Active · {activeModelLabel}
                   </span>
                 </div>
-                <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                  {modelOptions.map((option) => {
-                    const isActive = option.id === activeModelId;
-                    return (
-                      <button
-                        key={option.id}
-                        type="button"
-                        onClick={() => handleModelChange(option.id)}
-                        className={`group relative flex h-full flex-col gap-3 rounded-3xl border px-5 py-4 text-left transition ${
-                          isActive
-                            ? "border-cyan-300/60 bg-[#081632]/95 shadow-[0_50px_110px_-70px_rgba(14,165,233,0.6)]"
-                            : "border-white/10 bg-white/5 hover:border-cyan-200/50 hover:bg-white/10"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <span className="text-sm font-semibold text-white/85">
-                            {option.label}
-                          </span>
-                          <span
-                            className={`h-2 w-2 rounded-full transition ${
-                              isActive ? "bg-cyan-300" : "bg-white/30"
-                            }`}
-                          />
-                        </div>
-                        <p className="text-xs text-white/60">
-                          {option.tagline}
-                        </p>
-                        <div className="flex flex-wrap items-center gap-2 pt-1 text-[0.6rem] uppercase tracking-[0.28em]">
-                          {option.badges.map((badge) => (
-                            <span
-                              key={`${option.id}-${badge}`}
-                              className={`rounded-full border px-3 py-1 font-semibold transition ${
-                                isActive
-                                  ? "border-cyan-200/60 text-cyan-200"
-                                  : "border-white/12 text-white/50"
-                              }`}
-                            >
-                              {badge}
-                            </span>
-                          ))}
-                        </div>
-                        <span
-                          className={`block pt-1 text-[0.65rem] uppercase tracking-[0.28em] transition ${
-                            isActive ? "text-cyan-200" : "text-white/45"
-                          }`}
+                <div className="rounded-[28px] border border-white/10 bg-black/40 p-6">
+                  {topPredictionChart.length ? (
+                    <div className="space-y-4">
+                      {topPredictionChart.map((item) => (
+                        <div
+                          key={item.label}
+                          className="flex items-center gap-3"
                         >
-                          {option.footnote}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-semibold text-white/90 sm:text-2xl">
-                  Model Prediction Graph
-                </h2>
-                <span className="rounded-full border border-white/10 bg-white/10 px-4 py-1 text-xs text-white/70">
-                  {activeModelLabel}
-                </span>
-              </div>
-              <div className="rounded-[28px] border border-white/10 bg-black/40 p-6">
-                {topPredictionChart.length ? (
-                  <div className="space-y-4">
-                    {topPredictionChart.map((item) => (
-                      <div key={item.label} className="flex items-center gap-3">
-                        <span className="w-32 shrink-0 text-xs font-semibold uppercase tracking-[0.28em] text-white/55 sm:text-[0.7rem]">
-                          {item.label.replace(/_/g, " ")}
-                        </span>
-                        <div className="relative flex-1 overflow-hidden rounded-full bg-white/10">
-                          <div
-                            className={`absolute inset-y-0 left-0 rounded-full ${
-                              item.highlight
-                                ? "bg-linear-to-r from-cyan-400 via-sky-500 to-blue-600"
-                                : "bg-white/45"
-                            }`}
-                            style={{ width: `${Math.max(item.percent, 4)}%` }}
-                          />
+                          <span className="w-32 shrink-0 text-xs font-semibold uppercase tracking-[0.28em] text-white/55 sm:text-[0.7rem]">
+                            {item.label.replace(/_/g, " ")}
+                          </span>
+                          <div className="relative flex-1 overflow-hidden rounded-full bg-white/10">
+                            <div
+                              className={`absolute inset-y-0 left-0 rounded-full ${
+                                item.highlight
+                                  ? "bg-linear-to-r from-cyan-400 via-sky-500 to-blue-600"
+                                  : "bg-white/45"
+                              }`}
+                              style={{ width: `${Math.max(item.percent, 4)}%` }}
+                            />
+                          </div>
+                          <span className="w-12 text-right text-xs font-semibold text-white/75">
+                            {item.percent}%
+                          </span>
                         </div>
-                        <span className="w-12 text-right text-xs font-semibold text-white/75">
-                          {item.percent}%
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="flex h-full min-h-40 items-center justify-center text-sm text-white/60">
-                    Predictions will appear after running inference.
-                  </div>
-                )}
-              </div>
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-5 text-xs text-white/60 sm:text-sm">
-                Current top prediction: {disease.name} · Confidence{" "}
-                {confidencePercent}%
-                {topHeatmapPercent != null
-                  ? ` · Focus ${topHeatmapPercent}%`
-                  : ""}
-              </div>
-            </Motion.div>
-          </Motion.section>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex h-full min-h-40 items-center justify-center text-sm text-white/60">
+                      Predictions will appear after running inference.
+                    </div>
+                  )}
+                </div>
+                <div className="rounded-3xl border border-white/10 bg-white/5 p-5 text-xs text-white/60 sm:text-sm">
+                  Current top prediction: {disease.name} · Confidence{" "}
+                  {confidencePercent}%
+                  {topHeatmapPercent != null
+                    ? ` · Focus ${topHeatmapPercent}%`
+                    : ""}
+                </div>
+              </Motion.div>
+            </Motion.section>
 
-          <Motion.section
-            initial={{ opacity: 0, y: 40 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, amount: 0.3 }}
-            transition={{ ...smoothTransition, delay: 0.15 }}
-            className="relative mt-14 mx-auto w-full max-w-6xl px-2 sm:px-6"
-          >
-            <Motion.div
-              initial={{ opacity: 0, y: 30 }}
+            <Motion.section
+              initial={{ opacity: 0, y: 40 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, amount: 0.3 }}
-              transition={{ ...smoothTransition, delay: 0.05 }}
-              className="relative flex flex-col gap-5 overflow-hidden rounded-[34px] border border-white/10 bg-white/5 px-6 py-8 sm:px-8 sm:py-10 backdrop-blur-2xl"
+              transition={{ ...smoothTransition, delay: 0.15 }}
+              className="relative mt-14 mx-auto w-full max-w-6xl px-2 sm:px-6"
             >
-              <span className="pointer-events-none absolute inset-0 rounded-[inherit] border border-white/10" />
-              <h3 className="text-lg font-semibold text-white">
-                What is the Heat Map?
-              </h3>
-              <p className="text-sm leading-relaxed text-white/70">
-                A Heat Map translates model attention into color, projecting the
-                areas of an image that contribute most to a prediction. In our
-                viewer, it guides clinicians toward the regions the neural
-                network considers critical before they sign off on a case.
-              </p>
-              <p className="text-sm leading-relaxed text-white/70">
-                Teams use Heat Maps to validate automated findings, surface
-                unexpected focus points, and capture annotated feedback for
-                retraining. The approach builds trust in AI-assisted triage,
-                speeds peer review, and helps identify improvement targets for
-                future model releases.
-              </p>
-              <div className="pointer-events-none absolute -top-6 -left-6 h-36 w-36 rounded-full bg-[radial-gradient(circle,rgba(56,189,248,0.35),transparent_65%)] blur-3xl" />
-            </Motion.div>
-          </Motion.section>
+              <Motion.div
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.3 }}
+                transition={{ ...smoothTransition, delay: 0.05 }}
+                className="relative flex flex-col gap-5 overflow-hidden rounded-[34px] border border-white/10 bg-white/5 px-6 py-8 sm:px-8 sm:py-10 backdrop-blur-2xl"
+              >
+                <span className="pointer-events-none absolute inset-0 rounded-[inherit] border border-white/10" />
+                <h3 className="text-lg font-semibold text-white">
+                  What is the Heat Map?
+                </h3>
+                <p className="text-sm leading-relaxed text-white/70">
+                  A Heat Map translates model attention into color, projecting
+                  the areas of an image that contribute most to a prediction. In
+                  our viewer, it guides clinicians toward the regions the neural
+                  network considers critical before they sign off on a case.
+                </p>
+                <p className="text-sm leading-relaxed text-white/70">
+                  Teams use Heat Maps to validate automated findings, surface
+                  unexpected focus points, and capture annotated feedback for
+                  retraining. The approach builds trust in AI-assisted triage,
+                  speeds peer review, and helps identify improvement targets for
+                  future model releases.
+                </p>
+                <div className="pointer-events-none absolute -top-6 -left-6 h-36 w-36 rounded-full bg-[radial-gradient(circle,rgba(56,189,248,0.35),transparent_65%)] blur-3xl" />
+              </Motion.div>
+            </Motion.section>
 
-          <Motion.section
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ ...smoothTransition, delay: 0.35 }}
-            className="mt-14 flex flex-wrap justify-center gap-4"
-          >
-            <button
-              type="button"
-              onClick={() => handleNavigation("/predict")}
-              className={primaryButtonClasses}
+            <Motion.section
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ ...smoothTransition, delay: 0.35 }}
+              className="mt-14 flex flex-wrap justify-center gap-4"
             >
-              <span className="text-base leading-none">→</span>
-              <span>Predict</span>
-              <span className={buttonDotClasses} />
-            </button>
-            <button
-              type="button"
-              onClick={() => handleNavigation("/report")}
-              className={primaryButtonClasses}
-            >
-              <span className="text-base leading-none">↗</span>
-              <span>Report Generation</span>
-              <span className={buttonDotClasses} />
-            </button>
-            <button
-              type="button"
-              onClick={() => handleNavigation("/")}
-              className={primaryButtonClasses}
-            >
-              <span className="text-base leading-none">⌂</span>
-              <span>Home</span>
-              <span className={buttonDotClasses} />
-            </button>
-          </Motion.section>
-        </main>
+              <MagneticButton
+                onClick={() => handleNavigation("/predict")}
+                className={primaryButtonClasses}
+              >
+                <span className="text-base leading-none">→</span>
+                <span>Predict</span>
+                <span className={buttonDotClasses} />
+              </MagneticButton>
+              <MagneticButton
+                onClick={() => handleNavigation("/report")}
+                className={primaryButtonClasses}
+              >
+                <span className="text-base leading-none">↗</span>
+                <span>Report Generation</span>
+                <span className={buttonDotClasses} />
+              </MagneticButton>
+              <MagneticButton
+                onClick={() => handleNavigation("/")}
+                className={primaryButtonClasses}
+              >
+                <span className="text-base leading-none">⌂</span>
+                <span>Return Home</span>
+                <span className={buttonDotClasses} />
+              </MagneticButton>
+            </Motion.section>
+          </main>
+        </div>
+
+        <Motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.2 }}
+          transition={{ ...smoothTransition, delay: 0.4 }}
+        >
+          <Footer />
+        </Motion.div>
       </div>
-
-      <Motion.div
-        initial={{ opacity: 0, y: 20 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, amount: 0.2 }}
-        transition={{ ...smoothTransition, delay: 0.4 }}
-      >
-        <Footer />
-      </Motion.div>
-    </div>
+    </SmoothScroll>
   );
 }
 
